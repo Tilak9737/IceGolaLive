@@ -1,0 +1,15 @@
+services:
+  - type: web
+    runtime: node
+    name: shoptrack-api
+    rootDir: backend
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SHOP_PIN
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

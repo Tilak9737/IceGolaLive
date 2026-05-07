@@ -1,0 +1,2820 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ShopTrack — Order Manager</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet" />
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --bg: #0e0e0f;
+            --surface: #17171a;
+            --card: #1e1e23;
+            --border: #2e2e38;
+            --accent: #f5a623;
+            --accent2: #e8673a;
+            --green: #3ecf8e;
+            --red: #f05d5d;
+            --blue: #5d9cf0;
+            --muted: #6b6b80;
+            --text: #e8e8f0;
+            --subtext: #9898b0;
+            --mono: 'JetBrains Mono', monospace;
+            --display: 'Syne', sans-serif;
+            --r: 10px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, .5);
+        }
+
+        html {
+            scroll-behavior: smooth
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--display);
+            min-height: 100vh;
+            overflow-x: hidden
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+        }
+
+        /* ── HEADER ────────────────────────── */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            background: rgba(14, 14, 15, .92);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: -.5px
+        }
+
+        .logo-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 9px var(--accent);
+            animation: pulse 2s infinite
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1)
+            }
+
+            50% {
+                opacity: .55;
+                transform: scale(.82)
+            }
+        }
+
+        .hdr-right {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .chip {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 4px 12px;
+            font-family: var(--mono);
+            font-size: .72rem;
+            color: var(--subtext);
+            display: flex;
+            align-items: center;
+            gap: 5px
+        }
+
+        .chip strong {
+            color: var(--text);
+            font-size: .82rem
+        }
+
+        #session-timer {
+            font-family: var(--mono);
+            font-size: .7rem;
+            color: var(--muted)
+        }
+
+        /* ── MAIN ──────────────────────────── */
+        main {
+            position: relative;
+            z-index: 1;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 28px 20px 80px
+        }
+
+        /* ── BUTTONS ───────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 18px;
+            border: none;
+            border-radius: var(--r);
+            font-family: var(--display);
+            font-weight: 700;
+            font-size: .83rem;
+            cursor: pointer;
+            transition: all .16s ease;
+            letter-spacing: .2px;
+            user-select: none
+        }
+
+        .btn:active {
+            transform: scale(.95)
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #0e0e0f;
+            box-shadow: 0 0 18px rgba(245, 166, 35, .18)
+        }
+
+        .btn-primary:hover {
+            background: #f7b94a;
+            box-shadow: 0 0 26px rgba(245, 166, 35, .32)
+        }
+
+        .btn-ghost {
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border)
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--accent);
+            color: var(--accent)
+        }
+
+        .btn-danger {
+            background: rgba(240, 93, 93, .1);
+            color: var(--red);
+            border: 1px solid rgba(240, 93, 93, .22)
+        }
+
+        .btn-danger:hover {
+            background: rgba(240, 93, 93, .2)
+        }
+
+        .btn-success {
+            background: rgba(62, 207, 142, .1);
+            color: var(--green);
+            border: 1px solid rgba(62, 207, 142, .22)
+        }
+
+        .btn-success:hover {
+            background: rgba(62, 207, 142, .2)
+        }
+
+        .btn-sm {
+            padding: 5px 11px;
+            font-size: .76rem
+        }
+
+        .btn-end-day {
+            background: rgba(240, 93, 93, .1);
+            color: var(--red);
+            border: 1px solid rgba(240, 93, 93, .3)
+        }
+
+        .btn-end-day:hover {
+            background: rgba(240, 93, 93, .22);
+            border-color: var(--red)
+        }
+
+        .btn-end-day.armed {
+            background: var(--red);
+            color: #fff;
+            border-color: var(--red);
+            animation: urgentPulse .6s infinite alternate
+        }
+
+        @keyframes urgentPulse {
+            from {
+                box-shadow: 0 0 0 0 rgba(240, 93, 93, .4)
+            }
+
+            to {
+                box-shadow: 0 0 0 6px rgba(240, 93, 93, 0)
+            }
+        }
+
+        /* ── SUMMARY ───────────────────────── */
+        .summary-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 28px
+        }
+
+        .sc {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 16px 18px;
+            position: relative;
+            overflow: hidden
+        }
+
+        .sc::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px
+        }
+
+        .sc.o::after {
+            background: var(--accent)
+        }
+
+        .sc.g::after {
+            background: var(--green)
+        }
+
+        .sc.r::after {
+            background: var(--red)
+        }
+
+        .sc.b::after {
+            background: var(--blue)
+        }
+
+        .sc-label {
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 5px
+        }
+
+        .sc-val {
+            font-family: var(--mono);
+            font-size: 1.9rem;
+            font-weight: 700;
+            line-height: 1
+        }
+
+        .sc.o .sc-val {
+            color: var(--accent)
+        }
+
+        .sc.g .sc-val {
+            color: var(--green)
+        }
+
+        .sc.r .sc-val {
+            color: var(--red)
+        }
+
+        .sc.b .sc-val {
+            color: var(--blue)
+        }
+
+        /* ── TOOLBAR & FILTER ──────────────── */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            flex-wrap: wrap
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            flex-wrap: wrap
+        }
+
+        .tab {
+            padding: 6px 15px;
+            border-radius: 7px;
+            font-size: .76rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .14s;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--subtext);
+            letter-spacing: .3px;
+            user-select: none
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: #0e0e0f;
+            border-color: var(--accent)
+        }
+
+        .tab:not(.active):hover {
+            border-color: var(--accent);
+            color: var(--accent)
+        }
+
+        /* ── GRID ──────────────────────────── */
+        #customers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(390px, 1fr));
+            gap: 18px;
+            align-items: start
+        }
+
+        /* ── CUSTOMER CARD ─────────────────── */
+        .ccard {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            transition: box-shadow .2s, border-color .3s;
+            animation: slideIn .22s ease
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(14px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .ccard:hover {
+            box-shadow: var(--shadow)
+        }
+
+        .ccard.served {
+            opacity: .5;
+            border-color: rgba(62, 207, 142, .28)
+        }
+
+        .ccard.all-done {
+            border-color: rgba(62, 207, 142, .6);
+            box-shadow: 0 0 0 1px rgba(62, 207, 142, .25), 0 8px 32px rgba(62, 207, 142, .08)
+        }
+
+        .ccard.pay-ok {
+            border-color: rgba(62, 207, 142, .4)
+        }
+
+        .ccard.pay-partial {
+            border-color: rgba(245, 166, 35, .4)
+        }
+
+        .ccard.pay-none {
+            border-color: rgba(240, 93, 93, .35)
+        }
+
+        /* inline payment badge in header */
+        .pay-status-badge.paid {
+            background: rgba(62, 207, 142, .15);
+            color: var(--green);
+            border: 1px solid rgba(62, 207, 142, .3);
+            border-radius: 5px;
+            font-size: .62rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            white-space: nowrap
+        }
+
+        .pay-status-badge.partial {
+            background: rgba(245, 166, 35, .15);
+            color: var(--accent);
+            border: 1px solid rgba(245, 166, 35, .3);
+            border-radius: 5px;
+            font-size: .62rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            white-space: nowrap
+        }
+
+        .pay-status-badge.unpaid {
+            background: rgba(240, 93, 93, .12);
+            color: var(--red);
+            border: 1px solid rgba(240, 93, 93, .28);
+            border-radius: 5px;
+            font-size: .62rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            white-space: nowrap
+        }
+
+        .ccard-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px 12px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .cname-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0
+        }
+
+        .cavatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 7px;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: .82rem;
+            color: #0e0e0f
+        }
+
+        .cname-inp {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-family: var(--display);
+            font-weight: 700;
+            font-size: .92rem;
+            flex: 1;
+            min-width: 0;
+            border-bottom: 1px dashed transparent;
+            transition: border-color .2s;
+            padding-bottom: 1px
+        }
+
+        .cname-inp:focus {
+            border-color: var(--accent)
+        }
+
+        .cname-inp::placeholder {
+            color: var(--muted)
+        }
+
+        .served-badge {
+            background: rgba(62, 207, 142, .15);
+            color: var(--green);
+            border: 1px solid rgba(62, 207, 142, .28);
+            border-radius: 5px;
+            font-size: .65rem;
+            font-weight: 700;
+            padding: 3px 7px;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            flex-shrink: 0
+        }
+
+        .ccard-actions {
+            display: flex;
+            gap: 5px;
+            flex-shrink: 0
+        }
+
+        /* All-done prompt banner */
+        .all-done-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: linear-gradient(90deg, rgba(62, 207, 142, .12), rgba(62, 207, 142, .06));
+            border-bottom: 1px solid rgba(62, 207, 142, .2);
+            gap: 10px;
+        }
+
+        .all-done-text {
+            font-size: .78rem;
+            font-weight: 700;
+            color: var(--green);
+            display: flex;
+            align-items: center;
+            gap: 6px
+        }
+
+        .complete-cust-btn {
+            background: var(--green);
+            color: #0a0a0b;
+            border: none;
+            border-radius: 7px;
+            font-family: var(--display);
+            font-weight: 800;
+            font-size: .76rem;
+            padding: 6px 14px;
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .complete-cust-btn:hover {
+            background: #4dffaa;
+            transform: translateY(-1px)
+        }
+
+        .complete-cust-btn:active {
+            transform: scale(.94)
+        }
+
+        /* ── ITEMS LIST ───────────────────── */
+        .items-list {
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px
+        }
+
+        .no-items {
+            color: var(--muted);
+            font-size: .8rem;
+            text-align: center;
+            padding: 8px 0;
+            font-style: italic
+        }
+
+        /* ── ITEM ROW — BASE ──────────────── */
+        .item-row {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 12px 13px;
+            animation: fadeUp .18s ease;
+            transition: border-color .25s, background .25s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(6px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        /* ── ITEM ROW — SERVED STATE ──────── */
+        .item-row.item-done {
+            background: rgba(62, 207, 142, .04);
+            border-color: rgba(62, 207, 142, .35);
+        }
+
+        .item-row.item-done::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--green);
+            border-radius: 3px 0 0 3px;
+        }
+
+        .item-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 9px
+        }
+
+        .item-name-inp {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: .86rem;
+            flex: 1;
+            border-bottom: 1px dashed transparent;
+            transition: border-color .2s;
+            padding-bottom: 1px
+        }
+
+        .item-name-inp:focus {
+            border-color: var(--accent)
+        }
+
+        .item-name-inp::placeholder {
+            color: var(--muted)
+        }
+
+        .item-done .item-name-inp {
+            color: var(--green);
+            font-weight: 700
+        }
+
+        /* ── AUTOCOMPLETE ──────────────────── */
+        .ac-wrap {
+            position: relative;
+            flex: 1;
+            min-width: 0
+        }
+
+        .ac-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            z-index: 300;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+            display: none;
+        }
+
+        .ac-dropdown.open {
+            display: block
+        }
+
+        .ac-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            gap: 8px;
+            font-size: .82rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .ac-item:last-child {
+            border-bottom: none
+        }
+
+        .ac-item-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0
+        }
+
+        .ac-item-name {
+            font-weight: 700;
+            color: var(--text);
+            white-space: nowrap
+        }
+
+        .ac-item-name em {
+            color: var(--accent);
+            font-style: normal
+        }
+
+        .ac-item-type {
+            font-size: .66rem;
+            color: var(--muted);
+            font-family: var(--mono);
+            white-space: nowrap
+        }
+
+        .ac-item-price {
+            font-family: var(--mono);
+            font-weight: 800;
+            font-size: .8rem;
+            color: var(--accent);
+            white-space: nowrap;
+            margin-left: 4px
+        }
+
+        .ac-qty-btns {
+            display: flex;
+            gap: 3px;
+            flex-shrink: 0
+        }
+
+        .ac-qty {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--subtext);
+            border-radius: 5px;
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: .68rem;
+            padding: 4px 6px;
+            cursor: pointer;
+            transition: all .12s;
+            white-space: nowrap;
+            line-height: 1;
+        }
+
+        .ac-qty:hover {
+            background: var(--accent);
+            color: #0e0e0f;
+            border-color: var(--accent);
+            transform: translateY(-1px)
+        }
+
+        .ac-qty:active {
+            transform: scale(.9)
+        }
+
+        .item-del {
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: .95rem;
+            padding: 2px 5px;
+            transition: color .15s;
+            flex-shrink: 0;
+            line-height: 1
+        }
+
+        .item-del:hover {
+            color: var(--red)
+        }
+
+        /* served badge inline with name */
+        .item-served-badge {
+            background: rgba(62, 207, 142, .18);
+            color: var(--green);
+            border: 1px solid rgba(62, 207, 142, .3);
+            border-radius: 5px;
+            font-size: .62rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        /* ── COST ROW — prominent ──────────── */
+        .cost-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 10px;
+            background: rgba(245, 166, 35, .06);
+            border: 1px solid rgba(245, 166, 35, .22);
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
+        .cost-symbol {
+            font-family: var(--mono);
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--accent);
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        .cost-inp {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--accent);
+            font-family: var(--mono);
+            font-weight: 800;
+            font-size: 1.3rem;
+            width: 110px;
+            flex-shrink: 0;
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .cost-inp::-webkit-outer-spin-button,
+        .cost-inp::-webkit-inner-spin-button {
+            -webkit-appearance: none
+        }
+
+        .cost-inp::placeholder {
+            color: rgba(245, 166, 35, .3)
+        }
+
+        .cost-label {
+            font-size: .64rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            white-space: nowrap;
+            margin-left: auto;
+        }
+
+        .cost-hint {
+            font-size: .71rem;
+            color: var(--muted);
+            font-style: italic;
+            margin-bottom: 8px;
+            font-family: var(--mono);
+            padding: 0 2px;
+        }
+
+        /* ── PROGRESS ──────────────────────── */
+        .prog-wrap {
+            margin-bottom: 10px
+        }
+
+        .prog-labels {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--mono);
+            font-size: .69rem;
+            color: var(--subtext);
+            margin-bottom: 4px;
+            gap: 4px;
+            flex-wrap: wrap
+        }
+
+        .gave-val {
+            color: var(--green);
+            font-weight: 700
+        }
+
+        .remains-val {
+            color: var(--red);
+            font-weight: 700
+        }
+
+        .pct-val {
+            color: var(--muted)
+        }
+
+        .prog-track {
+            height: 5px;
+            background: var(--border);
+            border-radius: 99px;
+            overflow: hidden
+        }
+
+        .prog-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--green), #4dffaa66);
+            border-radius: 99px;
+            transition: width .3s ease
+        }
+
+        /* ── SERVED ITEM STATS (compact) ─── */
+        .served-stats {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+            font-family: var(--mono);
+            font-size: .72rem;
+            color: var(--subtext);
+            flex-wrap: wrap;
+        }
+
+        .served-stats strong {
+            color: var(--green)
+        }
+
+        /* ── SERVE BUTTON (primary CTA) ───── */
+        .serve-btn {
+            width: 100%;
+            padding: 10px;
+            background: rgba(62, 207, 142, .1);
+            border: 1.5px solid rgba(62, 207, 142, .35);
+            border-radius: 8px;
+            color: var(--green);
+            font-family: var(--display);
+            font-weight: 800;
+            font-size: .88rem;
+            cursor: pointer;
+            transition: all .15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            letter-spacing: .3px;
+            user-select: none;
+        }
+
+        .serve-btn:hover {
+            background: var(--green);
+            color: #0a0a0b;
+            border-color: var(--green);
+            box-shadow: 0 0 20px rgba(62, 207, 142, .25);
+            transform: translateY(-1px)
+        }
+
+        .serve-btn:active {
+            transform: scale(.97)
+        }
+
+        /* ── AMOUNT BUTTONS — always visible ── */
+        .amt-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 8px
+        }
+
+        .amt-section-label {
+            font-size: .62rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .6px
+        }
+
+        .edit-cost-btn {
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: .68rem;
+            cursor: pointer;
+            padding: 2px 0 6px;
+            transition: color .15s;
+            display: block
+        }
+
+        .edit-cost-btn:hover {
+            color: var(--accent)
+        }
+
+        .amt-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px
+        }
+
+        .amt-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: .7rem;
+            padding: 5px 8px;
+            cursor: pointer;
+            transition: all .13s;
+            white-space: nowrap;
+            user-select: none
+        }
+
+        .amt-btn:hover {
+            background: var(--green);
+            color: #0e0e0f;
+            border-color: var(--green);
+            transform: translateY(-1px)
+        }
+
+        .amt-btn:active {
+            transform: scale(.9)
+        }
+
+        .custom-row {
+            display: flex;
+            gap: 4px;
+            align-items: center
+        }
+
+        .custom-inp {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: .74rem;
+            padding: 5px 8px;
+            width: 90px;
+            outline: none;
+            transition: border-color .2s
+        }
+
+        .custom-inp:focus {
+            border-color: var(--accent)
+        }
+
+        .custom-inp::placeholder {
+            color: var(--muted)
+        }
+
+        .confirm-btn {
+            background: rgba(62, 207, 142, .12);
+            border: 1px solid rgba(62, 207, 142, .25);
+            color: var(--green);
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: .72rem;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: all .13s;
+            white-space: nowrap;
+            user-select: none
+        }
+
+        .confirm-btn:hover {
+            background: rgba(62, 207, 142, .25)
+        }
+
+        .confirm-btn:active {
+            transform: scale(.93)
+        }
+
+        /* ── UNDO BUTTON ───────────────────── */
+        .undo-btn {
+            background: rgba(240, 93, 93, .08);
+            border: 1px solid rgba(240, 93, 93, .2);
+            color: var(--red);
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: .68rem;
+            padding: 3px 9px;
+            cursor: pointer;
+            transition: all .13s;
+            white-space: nowrap;
+            user-select: none;
+            margin-left: auto
+        }
+
+        .undo-btn:hover {
+            background: rgba(240, 93, 93, .18)
+        }
+
+        .undo-btn:active {
+            transform: scale(.93)
+        }
+
+        /* ── PARCEL BUTTON ─────────────────── */
+        .parcel-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: transparent;
+            border: 1px dashed var(--border);
+            color: var(--muted);
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: .68rem;
+            padding: 3px 8px;
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .parcel-btn:hover {
+            border-color: var(--blue);
+            color: var(--blue)
+        }
+
+        .parcel-btn.is-parcel {
+            background: rgba(93, 156, 240, .1);
+            border: 1px solid rgba(93, 156, 240, .4);
+            color: var(--blue);
+        }
+
+        .paid-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 18px;
+            border-radius: 8px;
+            font-family: var(--display);
+            font-weight: 800;
+            font-size: .82rem;
+            cursor: pointer;
+            transition: all .18s;
+            letter-spacing: .3px;
+            user-select: none;
+            background: rgba(240, 93, 93, .1);
+            border: 1.5px solid rgba(240, 93, 93, .35);
+            color: var(--red);
+        }
+
+        .paid-btn:hover {
+            background: rgba(240, 93, 93, .2);
+            transform: translateY(-1px)
+        }
+
+        .paid-btn:active {
+            transform: scale(.95)
+        }
+
+        .paid-btn.is-paid {
+            background: rgba(62, 207, 142, .12);
+            border-color: rgba(62, 207, 142, .45);
+            color: var(--green);
+        }
+
+        /* ── PAYMENT METHOD BUTTONS ────────── */
+        .pay-method-row {
+            display: flex;
+            gap: 5px;
+            justify-content: center
+        }
+
+        .pay-method-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 13px;
+            border-radius: 7px;
+            font-family: var(--display);
+            font-weight: 800;
+            font-size: .74rem;
+            cursor: pointer;
+            transition: all .15s;
+            user-select: none;
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            color: var(--muted);
+            letter-spacing: .2px;
+        }
+
+        .pay-method-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent)
+        }
+
+        .pay-method-btn.active-cash {
+            background: rgba(62, 207, 142, .12);
+            border-color: rgba(62, 207, 142, .5);
+            color: var(--green)
+        }
+
+        .pay-method-btn.active-upi {
+            background: rgba(93, 156, 240, .12);
+            border-color: rgba(93, 156, 240, .5);
+            color: var(--blue)
+        }
+
+        /* ── CARD FOOTER & TOTALS ─────────── */
+        .ccard-footer {
+            padding: 10px 14px 13px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap
+        }
+
+        .ccard-totals {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 9px 16px;
+            background: var(--surface);
+            border-top: 1px solid var(--border)
+        }
+
+        .ct-grp {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px
+        }
+
+        .ct-lbl {
+            font-size: .6rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            font-family: var(--mono)
+        }
+
+        .ct-val {
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: .9rem
+        }
+
+        .ct-val.orange {
+            color: var(--accent)
+        }
+
+        .ct-val.green {
+            color: var(--green)
+        }
+
+        .ct-val.red {
+            color: var(--red)
+        }
+
+        /* ── EMPTY ─────────────────────────── */
+        #empty-state {
+            grid-column: 1/-1;
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--muted);
+            display: none
+        }
+
+        #empty-state.show {
+            display: block
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 14px;
+            opacity: .35
+        }
+
+        #empty-state h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 6px
+        }
+
+        #empty-state p {
+            font-size: .82rem
+        }
+
+        /* ── MODAL ─────────────────────────── */
+        .modal-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 500;
+            background: rgba(0, 0, 0, .65);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s
+        }
+
+        .modal-bg.open {
+            opacity: 1;
+            pointer-events: all
+        }
+
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 26px;
+            width: min(420px, 92vw);
+            transform: translateY(18px);
+            transition: transform .2s;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, .65)
+        }
+
+        .modal-bg.open .modal {
+            transform: translateY(0)
+        }
+
+        .modal h2 {
+            font-size: 1.1rem;
+            font-weight: 800;
+            margin-bottom: 18px
+        }
+
+        .fg {
+            margin-bottom: 14px
+        }
+
+        .fg label {
+            display: block;
+            font-size: .72rem;
+            font-weight: 700;
+            color: var(--subtext);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 5px
+        }
+
+        .fg input {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: var(--display);
+            font-size: .88rem;
+            padding: 9px 13px;
+            outline: none;
+            transition: border-color .2s
+        }
+
+        .fg input:focus {
+            border-color: var(--accent)
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 18px;
+            justify-content: flex-end
+        }
+
+        /* ── TOAST ─────────────────────────── */
+        #toast {
+            position: fixed;
+            bottom: 26px;
+            right: 26px;
+            z-index: 999;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 11px 18px;
+            font-size: .8rem;
+            font-weight: 600;
+            box-shadow: var(--shadow);
+            transform: translateY(14px);
+            opacity: 0;
+            transition: all .22s ease;
+            pointer-events: none
+        }
+
+        #toast.show {
+            transform: translateY(0);
+            opacity: 1
+        }
+
+        #toast.ok {
+            border-color: rgba(62, 207, 142, .35);
+            color: var(--green)
+        }
+
+        #toast.warn {
+            border-color: rgba(245, 166, 35, .35);
+            color: var(--accent)
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg)
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px
+        }
+
+        @media(max-width:580px) {
+            header {
+                padding: 0 14px
+            }
+
+            .chip {
+                display: none
+            }
+
+            main {
+                padding: 18px 10px 60px
+            }
+
+            #customers-grid {
+                grid-template-columns: 1fr
+            }
+
+            .summary-bar {
+                grid-template-columns: repeat(2, 1fr)
+            }
+        }
+    </style>
+    <!-- end styles -->
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">
+            <div class="logo-dot" id="sync-dot" title="Connecting..."></div>ShopTrack
+        </div>
+        <div class="hdr-right">
+            <div class="chip">Active <strong id="hdr-active">0</strong></div>
+            <div class="chip">Served <strong id="hdr-served">0</strong></div>
+            <span id="session-timer">--:--:--</span>
+            <button class="btn btn-end-day btn-sm" id="btn-endday">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                </svg>
+                Complete the Day
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <div class="summary-bar">
+            <div class="sc o">
+                <div class="sc-label">Total Billed</div>
+                <div class="sc-val" id="sum-total">₹0</div>
+            </div>
+            <div class="sc g">
+                <div class="sc-label">Collected</div>
+                <div class="sc-val" id="sum-gave">₹0</div>
+            </div>
+            <div class="sc r">
+                <div class="sc-label">Pending</div>
+                <div class="sc-val" id="sum-remains">₹0</div>
+            </div>
+            <div class="sc b">
+                <div class="sc-label">Customers</div>
+                <div class="sc-val" id="sum-custs">0</div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn btn-primary" id="btn-new">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                New Customer
+            </button>
+            <button class="btn btn-ghost" id="btn-clear">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                </svg>
+                Clear Served
+            </button>
+            <button class="btn btn-ghost" id="btn-export">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                Export PDF
+            </button>
+            <button class="btn btn-ghost" id="btn-menu">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M3 6h18M3 12h18M3 18h18" />
+                </svg>
+                Manage Menu
+            </button>
+        </div>
+
+        <div class="filter-tabs">
+            <div class="tab active" data-filter="all">All</div>
+            <div class="tab" data-filter="active">Active</div>
+            <div class="tab" data-filter="served">Served</div>
+            <div class="tab" data-filter="unpaid">Unpaid 💰</div>
+        </div>
+
+        <div id="customers-grid">
+            <div id="empty-state">
+                <div class="empty-icon">🛒</div>
+                <h2>No customers yet</h2>
+                <p>Click <strong>New Customer</strong> to start tracking orders</p>
+            </div>
+        </div>
+    </main>
+
+
+    <div class="modal-bg" id="menu-modal-bg">
+        <div class="modal" style="width: min(500px, 95vw);">
+            <h2>🍽️ Manage Menu</h2>
+            <div id="menu-list" style="max-height: 50vh; overflow-y: auto; margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Menu items injected here -->
+            </div>
+            <div class="fg" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <input type="text" id="new-menu-name" placeholder="Name (e.g. Mango)" style="flex: 2; min-width: 120px;">
+                <input type="text" id="new-menu-type" placeholder="Type (Plain)" style="flex: 1.5; min-width: 80px;">
+                <input type="number" id="new-menu-price" placeholder="₹" style="flex: 1; min-width: 60px;">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="btn-menu-close">Close</button>
+                <button class="btn btn-success" id="btn-menu-add">+ Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        /* ══ CONFIG ══════════════════════════ */
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:3001' 
+            : 'https://shoptrack-api.onrender.com'; // TODO: update if deploying
+            
+        let SHOP_PIN = localStorage.getItem('shoptrack_pin');
+        const AMT = [10, 20, 30, 40, 50, 70, 100, 150, 200];
+        const SKEY = 'shoptrack_v5';
+
+        /* ══ STATE ═══════════════════════════ */
+        const FALLBACK_MENU = [
+            { id: 'fb-1', name: 'Orange', type: 'Plain', price: 30 },
+            { id: 'fb-2', name: 'Orange', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-3', name: 'Kala Khatta', type: 'Plain', price: 30 },
+            { id: 'fb-4', name: 'Kala Khatta', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-5', name: 'Kaccha Aam', type: 'Plain', price: 30 },
+            { id: 'fb-6', name: 'Kaccha Aam', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-7', name: 'Kothu', type: 'Plain', price: 30 },
+            { id: 'fb-8', name: 'Kothu', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-9', name: 'Pineapple', type: 'Plain', price: 30 },
+            { id: 'fb-10', name: 'Pineapple', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-11', name: 'Rose', type: 'Plain', price: 30 },
+            { id: 'fb-12', name: 'Rose', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-13', name: 'Mango', type: 'Plain', price: 30 },
+            { id: 'fb-14', name: 'Mango', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-15', name: 'Blueberry', type: 'Plain', price: 30 },
+            { id: 'fb-16', name: 'Blueberry', type: 'Mava-Malai', price: 60 },
+            { id: 'fb-17', name: 'Rimzim', type: 'Plain', price: 30 },
+            { id: 'fb-18', name: 'Rimzim', type: 'Mava-Malai', price: 60 },
+            { id: 'fb-19', name: 'Chocolate', type: 'Plain', price: 40 },
+            { id: 'fb-20', name: 'Chocolate', type: 'Mava-Malai', price: 60 },
+            { id: 'fb-21', name: 'Raj Bhog', type: 'Plain', price: 40 },
+            { id: 'fb-22', name: 'Raj Bhog', type: 'Mava-Malai', price: 60 },
+            { id: 'fb-23', name: 'Rainbow', type: 'Plain', price: 50 },
+            { id: 'fb-24', name: 'Rainbow', type: 'Mava-Malai', price: 70 },
+            { id: 'fb-25', name: 'Dry Fruit Dish', type: 'Sp. Dish', price: 80 },
+            { id: 'fb-26', name: 'Dry Fruit Dish', type: 'Ice Cream Dish', price: 110 },
+            { id: 'fb-27', name: 'Dry Fruit Rabdi Ice Dish', type: 'Sp. Dish', price: 100 },
+            { id: 'fb-28', name: 'Dry Fruit Rabdi Ice Dish', type: 'Ice Cream Dish', price: 120 },
+            { id: 'fb-29', name: 'Rainbow Rabdi Ice Dish', type: 'Sp. Dish', price: 100 },
+            { id: 'fb-30', name: 'Rainbow Rabdi Ice Dish', type: 'Ice Cream Dish', price: 120 },
+            { id: 'fb-31', name: 'Chocolate Ice Dish', type: 'Sp. Dish', price: 100 },
+            { id: 'fb-32', name: 'Chocolate Ice Dish', type: 'Ice Cream Dish', price: 120 },
+            { id: 'fb-33', name: 'Kit-Kat Chocolate Sp. Dish', type: 'Sp. Dish', price: 120 },
+            { id: 'fb-34', name: 'Kit-Kat Chocolate Sp. Dish', type: 'Ice Cream Dish', price: 150 },
+            { id: 'fb-35', name: 'Shree Hari Sp. Ice Dish', type: 'Matka Small', price: 160 },
+            { id: 'fb-36', name: 'Shree Hari Sp. Ice Dish', type: 'Matka Large', price: 200 },
+            { id: 'fb-37', name: 'Mava Malai', type: 'Topping', price: 20 },
+            { id: 'fb-38', name: 'Chocolate Deep', type: 'Topping', price: 20 },
+            { id: 'fb-39', name: 'Toppings', type: 'Topping', price: 10 }
+        ];
+
+        let MENU = [];
+        let S = { customers: [], createdAt: Date.now(), version: 0 };
+        let activeFilter = 'all';
+        let syncStatus = 'offline';
+
+        /* ══ PERSIST / API ════════════════════ */
+        let isSyncing = false;
+        let syncQueue = false;
+
+        async function save() {
+            S.version++;
+            S.savedAt = Date.now();
+            try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { }
+            if (typeof updateSavedAt === 'function') updateSavedAt();
+            
+            if (!SHOP_PIN) return;
+            if (isSyncing) {
+                syncQueue = true;
+                return;
+            }
+            
+            isSyncing = true;
+            try {
+                const res = await fetch(`${API_BASE}/api/sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-shop-pin': SHOP_PIN },
+                    body: JSON.stringify(S)
+                });
+                if (res.status === 401) {
+                    toast('Invalid PIN!', 'warn');
+                    requirePin();
+                } else if (res.status === 409) {
+                    const data = await res.json();
+                    S = data.state;
+                    renderAll();
+                    toast('State synced with server', 'warn');
+                }
+            } catch (err) {
+                console.error('Sync failed', err);
+            } finally {
+                isSyncing = false;
+                if (syncQueue) {
+                    syncQueue = false;
+                    save();
+                }
+            }
+        }
+
+        async function load() {
+            try {
+                const r = localStorage.getItem(SKEY); 
+                if (r) {
+                    const d = JSON.parse(r);
+                    if (d && d.customers) S = d;
+                }
+            } catch (e) { localStorage.removeItem(SKEY); }
+
+            if (!SHOP_PIN) return requirePin();
+
+            try {
+                const res = await fetch(`${API_BASE}/api/state`, {
+                    headers: { 'x-shop-pin': SHOP_PIN }
+                });
+                if (res.status === 401) return requirePin();
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.state && data.state.version > S.version) S = data.state;
+                    MENU = data.menu;
+                    renderAll();
+                    setupSSE();
+                }
+            } catch (err) {
+                console.error('Initial load failed', err);
+                MENU = FALLBACK_MENU;
+                renderAll();
+                toast('Offline mode — using backup menu', 'warn');
+                setupSSE();
+            }
+        }
+
+        function requirePin() {
+            const pin = prompt('Enter 4-digit Shop PIN:');
+            if (pin) {
+                SHOP_PIN = pin;
+                localStorage.setItem('shoptrack_pin', pin);
+                load();
+            }
+        }
+
+        let evtSource;
+        function setupSSE() {
+            if (evtSource) evtSource.close();
+            if (!SHOP_PIN) return;
+            evtSource = new EventSource(`${API_BASE}/api/events?pin=${SHOP_PIN}`);
+            
+            evtSource.onopen = () => {
+                syncStatus = 'live';
+                updateSyncUI();
+            };
+            
+            evtSource.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'init' || data.type === 'update') {
+                        if (data.state && data.state.version > S.version) {
+                            S = data.state;
+                            try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch(e){}
+                            renderAll();
+                        }
+                        if (data.menu) MENU = data.menu;
+                    }
+                } catch(err) {}
+            };
+            
+            evtSource.onerror = () => {
+                syncStatus = 'offline';
+                updateSyncUI();
+                evtSource.close();
+                setTimeout(setupSSE, 5000);
+            };
+        }
+
+        function updateSyncUI() {
+            const el = document.getElementById('sync-dot');
+            if (el) {
+                if (syncStatus === 'live') el.style.background = 'var(--green)';
+                else el.style.background = 'var(--red)';
+            }
+        }
+
+        /* ══ UTILS ═══════════════════════════ */
+        function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+        function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        let _tt;
+        function toast(msg, type = 'ok') {
+            const el = document.getElementById('toast');
+            el.textContent = msg; el.className = 'show ' + type;
+            clearTimeout(_tt); _tt = setTimeout(() => el.className = '', 2600);
+        }
+
+        /* ══ LOOKUPS ══════════════════════════ */
+        function gc(cid) { return S.customers.find(c => c.id === cid); }
+        function gi(cid, iid) { return gc(cid)?.items.find(i => i.id === iid); }
+
+        /* ══ MODAL ═══════════════════════════ */
+        // (modal removed — customers created directly)
+
+        /* ══ CUSTOMER ACTIONS ════════════════ */
+        function createCustomer() {
+            // find lowest number not already in use
+            const used = new Set(S.customers.map(c => {
+                const m = c.name.match(/^Customer (\d+)$/);
+                return m ? parseInt(m[1]) : null;
+            }).filter(n => n !== null));
+            let n = 1;
+            while (used.has(n)) n++;
+            const name = 'Customer ' + n;
+            S.customers.unshift({ id: uid(), name, served: false, createdAt: Date.now(), items: [], paid: 0 });
+            save(); renderAll(); toast(name + ' added!');
+        }
+
+        function removeCustomer(cid) {
+            // Two-click guard — no confirm() (blocked in iframes)
+            const btn = document.querySelector(`[data-action="delcust"][data-cid="${cid}"]`);
+            if (!btn) return;
+            if (btn.dataset.armed === '1') {
+                S.customers = S.customers.filter(c => c.id !== cid);
+                save(); renderAll(); toast('Customer removed', 'warn');
+            } else {
+                btn.dataset.armed = '1';
+                btn.textContent = 'Sure?';
+                btn.style.background = 'rgba(240,93,93,.3)';
+                setTimeout(() => {
+                    if (btn && btn.isConnected) { btn.dataset.armed = '0'; btn.textContent = '✕'; btn.style.background = ''; }
+                }, 2500);
+            }
+        }
+
+        function toggleServed(cid) {
+            const c = gc(cid); if (!c) return;
+            // block marking served if not paid (only when trying to serve, not when reopening)
+            if (!c.served && !c.paid) {
+                toast('💳 Mark as paid first!', 'warn'); return;
+            }
+            c.served = !c.served; save(); renderAll();
+            toast(c.served ? '✅ Customer marked served' : 'Reopened');
+        }
+
+        function completeCustomer(cid) {
+            const c = gc(cid); if (!c) return;
+            if (!c.paid) {
+                toast('💳 Mark as paid first!', 'warn'); return;
+            }
+            c.items.forEach(i => { i.served = true; if (i.total > 0) i.gave = i.total; });
+            c.served = true;
+            save(); renderAll();
+            toast('🎉 ' + c.name + ' completed!');
+        }
+
+        /* ══ ITEM ACTIONS ════════════════════ */
+        function addItem(cid) {
+            const c = gc(cid); if (!c) return;
+            const newId = uid();
+            c.items.push({ id: newId, name: 'New Item', total: 0, gave: 0, served: false });
+            save(); rebuildCard(cid);
+            setTimeout(() => {
+                const inp = document.querySelector(`#item-${cid}-${newId} .item-name-inp`);
+                if (inp) { inp.focus(); inp.select(); }
+            }, 50);
+        }
+
+        function removeItem(cid, iid) {
+            const c = gc(cid); if (!c) return;
+            c.items = c.items.filter(i => i.id !== iid);
+            save(); rebuildCard(cid);
+        }
+
+        function serveItem(cid, iid) {
+            const item = gi(cid, iid); if (!item) return;
+            item.served = true;
+            item.gave = item.total;   // gave = full cost when served
+            save(); rebuildCard(cid); updateSummary();
+            checkAllDone(cid);
+        }
+
+        function unserveItem(cid, iid) {
+            const item = gi(cid, iid); if (!item) return;
+            item.served = false;
+            save(); rebuildCard(cid); updateSummary();
+        }
+
+        // (partial panel always open — no toggle needed)
+
+        /* adds to COST (total) — what + buttons do */
+        function addCost(cid, iid, amount) {
+            const item = gi(cid, iid); if (!item) return;
+            item.total = item.total + amount;
+            save();
+            const row = document.getElementById('item-' + cid + '-' + iid);
+            if (row) {
+                const inp = row.querySelector('.cost-inp');
+                if (inp) inp.value = item.total;
+                const serveBtn = row.querySelector('.serve-btn');
+                if (serveBtn) serveBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> SERVE &nbsp;•&nbsp; ₹${item.total}`;
+                const cr = row.querySelector('.cost-row');
+                if (cr) { cr.style.borderColor = 'var(--green)'; setTimeout(() => cr.style.borderColor = '', 400); }
+            }
+            refreshCardTotals(cid); updateSummary();
+        }
+
+        function addCustomCost(cid, iid) {
+            const inp = document.querySelector(`#item-${cid}-${iid} .custom-inp`);
+            if (!inp) return;
+            const v = parseInt(inp.value);
+            if (!v || v <= 0) { inp.focus(); return; }
+            addCost(cid, iid, v); inp.value = ''; inp.focus();
+        }
+
+        function setTotal(cid, iid, raw) {
+            const item = gi(cid, iid); if (!item) return;
+            item.total = Math.max(0, parseInt(raw) || 0);
+            save();
+            const row = document.getElementById('item-' + cid + '-' + iid);
+            if (row) {
+                const serveBtn = row.querySelector('.serve-btn');
+                if (serveBtn) serveBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> SERVE &nbsp;•&nbsp; ₹${item.total}`;
+            }
+            refreshCardTotals(cid); updateSummary();
+        }
+
+        function setItemName(cid, iid, v) { const i = gi(cid, iid); if (i) { i.name = v; save(); } }
+
+        function toggleParcel(cid, iid) {
+            const item = gi(cid, iid); if (!item) return;
+            item.parcel = !item.parcel;
+            save();
+            const row = document.getElementById('item-' + cid + '-' + iid);
+            if (!row) return;
+            const btn = row.querySelector('.parcel-btn');
+            if (btn) {
+                btn.classList.toggle('is-parcel', !!item.parcel);
+                btn.innerHTML = item.parcel ? '📦 Parcel' : '📦 Parcel?';
+            }
+        }
+        function setCustName(cid, v) {
+            const c = gc(cid); if (!c) return; c.name = v;
+            const av = document.querySelector('#card-' + cid + ' .cavatar');
+            if (av) av.textContent = (v || '?')[0].toUpperCase();
+            save();
+        }
+
+        /* ══ PAYMENT ACTIONS ══════════════════ */
+        function billTotal(c) { return c.items.reduce((s, i) => s + i.total, 0); }
+        function payStatus(c) { return c.paid ? 'paid' : 'unpaid'; }
+
+        function togglePaid(cid) {
+            const c = gc(cid); if (!c) return;
+            c.paid = c.paid ? 0 : 1;
+            if (!c.paid) c.payMethod = null; // clear method when unpaid
+            save();
+            const card = document.getElementById('card-' + cid);
+            if (card) {
+                const btn = card.querySelector('.paid-btn');
+                if (btn) {
+                    btn.classList.toggle('is-paid', !!c.paid);
+                    btn.innerHTML = c.paid
+                        ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> PAID'
+                        : '💳 PAID?';
+                }
+                // clear method buttons if unpaid
+                if (!c.paid) {
+                    card.querySelectorAll('.pay-method-btn').forEach(b => {
+                        b.classList.remove('active-cash', 'active-upi');
+                    });
+                }
+                card.classList.toggle('pay-ok', !!c.paid);
+                card.classList.toggle('pay-none', !c.paid);
+            }
+            updateSummary();
+            toast(c.paid ? '💚 Payment received!' : 'Marked unpaid', c.paid ? 'ok' : 'warn');
+        }
+
+        /* ══ CHECK ALL-DONE ══════════════════ */
+        function checkAllDone(cid) {
+            const c = gc(cid); if (!c || c.items.length === 0) return;
+            if (c.items.every(i => i.served) && !c.served) {
+                toast('🎉 All items served — tap Complete!');
+                // The card will show the banner via rebuildCard
+            }
+        }
+
+        /* ══ SELECTIVE DOM UPDATES ═══════════ */
+        function refreshItemStats(cid, iid) {
+            const item = gi(cid, iid);
+            const row = document.getElementById('item-' + cid + '-' + iid);
+            if (!item || !row) return;
+            const rem = Math.max(0, item.total - item.gave);
+            const pct = item.total > 0 ? Math.min(100, Math.round((item.gave / item.total) * 100)) : 0;
+            const gv = row.querySelector('.gave-val');
+            const rv = row.querySelector('.remains-val');
+            const pv = row.querySelector('.pct-val');
+            const pf = row.querySelector('.prog-fill');
+            if (gv) gv.textContent = '₹' + item.gave;
+            if (rv) rv.textContent = '₹' + rem;
+            if (pv) pv.textContent = pct + '%';
+            if (pf) pf.style.width = pct + '%';
+        }
+
+        function refreshCardTotals(cid) {
+            const c = gc(cid), el = document.getElementById('card-' + cid);
+            if (!c || !el) return;
+            const tot = c.items.reduce((s, i) => s + i.total, 0);
+            const gav = c.items.reduce((s, i) => s + i.gave, 0);
+            const t = el.querySelector('.ct-total');
+            const g = el.querySelector('.ct-gave');
+            const r = el.querySelector('.ct-rem');
+            if (t) t.textContent = tot;
+            if (g) g.textContent = gav;
+            if (r) r.textContent = Math.max(0, tot - gav);
+        }
+
+        /* ══ BUILD ITEM HTML ════════════════ */
+        function itemHTML(cid, item) {
+            const rem = Math.max(0, item.total - item.gave);
+            const pct = item.total > 0 ? Math.min(100, Math.round((item.gave / item.total) * 100)) : 0;
+
+            /* ── SERVED STATE ── */
+            if (item.served) {
+                return `
+    <div class="item-row item-done" id="item-${cid}-${item.id}">
+      <div class="item-top">
+        <input class="item-name-inp" value="${esc(item.name)}" placeholder="Item name"
+          data-action="setname" data-cid="${cid}" data-iid="${item.id}"/>
+        <span class="item-served-badge">✓ Served</span>
+        ${item.parcel ? '<span style="background:rgba(93,156,240,.12);color:var(--blue);border:1px solid rgba(93,156,240,.3);border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 7px;white-space:nowrap">📦 Parcel</span>' : ''}
+        <button class="item-del" data-action="delitem" data-cid="${cid}" data-iid="${item.id}" title="Remove">✕</button>
+      </div>
+      <div class="served-stats">
+        <span>Cost: <strong>₹${item.total}</strong></span>
+        <span>Gave: <strong>₹${item.gave}</strong></span>
+        <button class="undo-btn" data-action="unserve" data-cid="${cid}" data-iid="${item.id}">↩ Undo</button>
+      </div>
+      <div class="prog-track"><div class="prog-fill" style="width:100%"></div></div>
+    </div>`;
+            }
+
+            /* ── ACTIVE STATE ── */
+            const amtBtns = AMT.map(a =>
+                `<button class="amt-btn" data-action="addcost" data-cid="${cid}" data-iid="${item.id}" data-amt="${a}">+${a}</button>`
+            ).join('');
+
+            return `
+  <div class="item-row" id="item-${cid}-${item.id}">
+
+    <!-- NAME + AUTOCOMPLETE + DELETE -->
+    <div class="item-top">
+      <div class="ac-wrap">
+        <input class="item-name-inp" value="${esc(item.name)}" placeholder="Type to search menu…"
+          data-action="setname" data-cid="${cid}" data-iid="${item.id}"
+          autocomplete="off"/>
+        <div class="ac-dropdown" id="ac-${cid}-${item.id}"></div>
+      </div>
+      <button class="item-del" data-action="delitem" data-cid="${cid}" data-iid="${item.id}" title="Remove">✕</button>
+    </div>
+
+    <!-- COST FIELD — type or use + buttons below -->
+    <div class="cost-row">
+      <span class="cost-symbol">₹</span>
+      <input class="cost-inp" type="number" value="${item.total || ''}" min="0" placeholder="0"
+        data-action="settotal" data-cid="${cid}" data-iid="${item.id}"/>
+      <span class="cost-label">item cost</span>
+      <button class="parcel-btn${item.parcel ? ' is-parcel' : ''}" data-action="toggleparcel" data-cid="${cid}" data-iid="${item.id}">
+        ${item.parcel ? '📦 Parcel' : '📦 Parcel?'}
+      </button>
+    </div>
+
+    <!-- + SHORTCUTS — hidden once cost is set -->
+    <div class="amt-section" id="amts-${cid}-${item.id}" style="${item.total > 0 ? 'display:none' : ''}">
+      <div class="amt-section-label">Quick add to cost:</div>
+      <div class="amt-row">${amtBtns}</div>
+      <div class="custom-row">
+        <input class="custom-inp" type="number" min="1" placeholder="other amount…"
+          data-cid="${cid}" data-iid="${item.id}"/>
+        <button class="confirm-btn" data-action="addcost-custom" data-cid="${cid}" data-iid="${item.id}">+ Add</button>
+      </div>
+    </div>
+    ${item.total > 0 ? `<button class="edit-cost-btn" data-action="showcost" data-cid="${cid}" data-iid="${item.id}">✏️ change cost</button>` : ''}
+
+    <!-- SERVE = mark as given/done -->
+    <button class="serve-btn" data-action="serve" data-cid="${cid}" data-iid="${item.id}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+      SERVE  •  ₹${item.total || 0}
+    </button>
+
+  </div>`;
+        }
+
+        /* ══ BUILD CARD HTML ════════════════ */
+        function cardHTML(c) {
+            const tot = c.items.reduce((s, i) => s + i.total, 0);
+            const allDone = c.items.length > 0 && c.items.every(i => i.served) && !c.served;
+            const payClass = c.paid ? ' pay-ok' : ' pay-none';
+
+            const itemsHTML = c.items.length
+                ? c.items.map(i => itemHTML(c.id, i)).join('')
+                : '<div class="no-items">No items yet — click Add Item below</div>';
+
+            const allDoneBanner = allDone
+                ? '<div class="all-done-banner"><div class="all-done-text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>All items served!</div>'
+                + '<button class="complete-cust-btn" data-action="completecust" data-cid="' + c.id + '">Complete →</button></div>'
+                : '';
+
+            const paidBtnInner = c.paid
+                ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> PAID'
+                : '💳 PAID?';
+
+            return `
+  <div class="ccard${c.served ? ' served' : ''}${payClass}" id="card-${c.id}">
+    <div class="ccard-hdr">
+      <div class="cname-wrap">
+        <div class="cavatar">${(c.name || '?')[0].toUpperCase()}</div>
+        <input class="cname-inp" value="${esc(c.name)}" placeholder="Customer name"
+          data-action="setcname" data-cid="${c.id}"/>
+      </div>
+      ${c.served ? '<span class="served-badge">✓ Served</span>' : ''}
+      <div class="ccard-actions">
+        <button class="btn btn-sm btn-success" data-action="toggleserved" data-cid="${c.id}"
+          title="${c.served ? 'Reopen' : 'Mark customer served'}">${c.served ? '↺' : '✓'}</button>
+        <button class="btn btn-sm btn-danger" data-action="delcust" data-cid="${c.id}" title="Remove customer">✕</button>
+      </div>
+    </div>
+
+    ${allDoneBanner}
+
+    <div class="items-list">${itemsHTML}</div>
+
+    <div class="ccard-footer">
+      <button class="btn btn-ghost btn-sm" data-action="additem" data-cid="${c.id}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Item
+      </button>
+    </div>
+
+    <div class="ccard-totals">
+      <div class="ct-grp"><span class="ct-lbl">Bill</span><span class="ct-val orange ct-total">₹${tot}</span></div>
+      <div class="ct-grp">
+        <button class="paid-btn${c.paid ? ' is-paid' : ''}" data-action="togglepaid" data-cid="${c.id}">
+          ${paidBtnInner}
+        </button>
+      </div>
+      <div class="ct-grp">
+        <div class="pay-method-row">
+          <button class="pay-method-btn${c.payMethod === 'cash' ? ' active-cash' : ''}" data-action="setpaymethod" data-cid="${c.id}" data-method="cash">💵 Cash</button>
+          <button class="pay-method-btn${c.payMethod === 'upi' ? ' active-upi' : ''}" data-action="setpaymethod" data-cid="${c.id}" data-method="upi">📲 UPI</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+        }
+
+        /* ══ REBUILD CARD ═════════════════════ */
+        function rebuildCard(cid) {
+            const c = gc(cid), el = document.getElementById('card-' + cid);
+            if (!c || !el) { renderAll(); return; }
+            const tmp = document.createElement('div');
+            tmp.innerHTML = cardHTML(c);
+            el.replaceWith(tmp.firstElementChild);
+            updateSummary();
+        }
+
+        /* ══ RENDER ALL ═══════════════════════ */
+        function filtered() {
+            if (activeFilter === 'active') return S.customers.filter(c => !c.served);
+            if (activeFilter === 'served') return S.customers.filter(c => c.served);
+            if (activeFilter === 'unpaid') return S.customers.filter(c => payStatus(c) !== 'paid');
+            return S.customers;
+        }
+        function renderAll() {
+            const grid = document.getElementById('customers-grid');
+            grid.querySelectorAll('.ccard').forEach(e => e.remove());
+            document.getElementById('empty-state').classList.toggle('show', S.customers.length === 0);
+            filtered().forEach(c => {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = cardHTML(c);
+                grid.appendChild(tmp.firstElementChild);
+            });
+            updateSummary();
+        }
+
+        /* ══ SUMMARY ══════════════════════════ */
+        function updateSummary() {
+            let billed = 0, collected = 0;
+            S.customers.forEach(c => {
+                const b = c.items.reduce((s, i) => s + i.total, 0);
+                billed += b;
+                if (c.paid) collected += b;
+            });
+            document.getElementById('sum-total').textContent = '₹' + billed;
+            document.getElementById('sum-gave').textContent = '₹' + collected;
+            document.getElementById('sum-remains').textContent = '₹' + Math.max(0, billed - collected);
+            document.getElementById('sum-custs').textContent = S.customers.length;
+            document.getElementById('hdr-active').textContent = S.customers.filter(c => !c.served).length;
+            document.getElementById('hdr-served').textContent = S.customers.filter(c => c.served).length;
+        }
+
+        /* ══ AUTOCOMPLETE ENGINE ══════════════ */
+        function menuSearch(q) {
+            if (!q || q.length < 1) return [];
+            const lq = q.toLowerCase();
+            return MENU.filter(m =>
+                m.name.toLowerCase().includes(lq) ||
+                m.type.toLowerCase().includes(lq) ||
+                (m.name + ' ' + m.type).toLowerCase().includes(lq)
+            ).slice(0, 8);
+        }
+
+        function highlightMatch(text, q) {
+            if (!q) return esc(text);
+            const idx = text.toLowerCase().indexOf(q.toLowerCase());
+            if (idx < 0) return esc(text);
+            return esc(text.slice(0, idx))
+                + '<em>' + esc(text.slice(idx, idx + q.length)) + '</em>'
+                + esc(text.slice(idx + q.length));
+        }
+
+        function applyMenuItem(cid, iid, menuItem, qty, inp, dd) {
+            const totalPrice = menuItem.price * qty;
+            const label = qty > 1
+                ? menuItem.name + ' (' + menuItem.type + ') ×' + qty
+                : menuItem.name + ' (' + menuItem.type + ')';
+            inp.value = label;
+            setItemName(cid, iid, label);
+            const item = gi(cid, iid);
+            if (item) { item.total = totalPrice; save(); }
+            const row = document.getElementById('item-' + cid + '-' + iid);
+            if (row) {
+                const ci = row.querySelector('.cost-inp');
+                if (ci) ci.value = totalPrice;
+                const sb = row.querySelector('.serve-btn');
+                if (sb) sb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> SERVE &nbsp;•&nbsp; ₹' + totalPrice;
+                const cr = row.querySelector('.cost-row');
+                if (cr) { cr.style.borderColor = 'var(--green)'; setTimeout(() => cr.style.borderColor = '', 400); }
+            }
+            refreshCardTotals(cid); updateSummary();
+            dd.classList.remove('open'); dd.innerHTML = '';
+            // hide quick-cost picker since cost is now set
+            const amts = document.getElementById('amts-' + cid + '-' + iid);
+            if (amts) amts.style.display = 'none';
+            const editBtn = document.querySelector('#item-' + cid + '-' + iid + ' .edit-cost-btn');
+            if (editBtn) editBtn.style.display = '';
+        }
+
+        function showAutocomplete(inp, cid, iid) {
+            const q = inp.value.trim();
+            const dd = document.getElementById('ac-' + cid + '-' + iid);
+            if (!dd) return;
+            const results = menuSearch(q);
+            if (!results.length || !q) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+
+            dd.innerHTML = results.map((m, i) => {
+                const qtyBtns = [1, 2, 3, 4, 5].map(n =>
+                    '<button class="ac-qty" data-ridx="' + i + '" data-qty="' + n + '">×' + n + '</button>'
+                ).join('');
+                return '<div class="ac-item" data-idx="' + i + '">'
+                    + '<div class="ac-item-left">'
+                    + '<span class="ac-item-name">' + highlightMatch(m.name, q) + '</span>'
+                    + '<span class="ac-item-type">' + m.type + '</span>'
+                    + '<span class="ac-item-price">₹' + m.price + '</span>'
+                    + '</div>'
+                    + '<div class="ac-qty-btns">' + qtyBtns + '</div>'
+                    + '</div>';
+            }).join('');
+            dd.classList.add('open');
+
+            // qty button clicks
+            dd.querySelectorAll('.ac-qty').forEach(btn => {
+                btn.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    const m = results[parseInt(btn.dataset.ridx)];
+                    const qty = parseInt(btn.dataset.qty);
+                    applyMenuItem(cid, iid, m, qty, inp, dd);
+                });
+            });
+        }
+
+        function hideAutocomplete(cid, iid) {
+            const dd = document.getElementById('ac-' + cid + '-' + iid);
+            if (dd) { dd.classList.remove('open'); dd.innerHTML = ''; }
+        }
+
+        /* ══ EVENT DELEGATION ═════════════════ */
+        const grid = document.getElementById('customers-grid');
+
+        grid.addEventListener('click', e => {
+            const btn = e.target.closest('[data-action]'); if (!btn) return;
+            const { action, cid, iid, amt } = btn.dataset;
+            if (action === 'serve') serveItem(cid, iid);
+            if (action === 'unserve') unserveItem(cid, iid);
+            if (action === 'addcost') addCost(cid, iid, parseInt(amt));
+            if (action === 'addcost-custom') addCustomCost(cid, iid);
+            if (action === 'toggleparcel') toggleParcel(cid, iid);
+            if (action === 'showcost') {
+                const s = document.getElementById('amts-' + cid + '-' + iid);
+                const b = e.target.closest('[data-action]');
+                if (s) { s.style.display = ''; if (b) b.style.display = 'none'; }
+            }
+            if (action === 'delitem') removeItem(cid, iid);
+            if (action === 'delcust') removeCustomer(cid);
+            if (action === 'toggleserved') toggleServed(cid);
+            if (action === 'additem') addItem(cid);
+            if (action === 'completecust') completeCustomer(cid);
+            if (action === 'togglepaid') togglePaid(cid);
+            if (action === 'setpaymethod') {
+                const c = gc(cid); if (!c) return;
+                // toggle off if already selected, else set
+                c.payMethod = c.payMethod === btn.dataset.method ? null : btn.dataset.method;
+                // auto-mark as paid when a method is selected
+                if (c.payMethod) c.paid = 1;
+                save();
+                // update buttons in place
+                const card = document.getElementById('card-' + cid);
+                if (card) {
+                    card.querySelectorAll('.pay-method-btn').forEach(b => {
+                        b.classList.toggle('active-cash', c.payMethod === 'cash' && b.dataset.method === 'cash');
+                        b.classList.toggle('active-upi', c.payMethod === 'upi' && b.dataset.method === 'upi');
+                    });
+                    const pb = card.querySelector('.paid-btn');
+                    if (pb) {
+                        pb.classList.toggle('is-paid', !!c.paid);
+                        pb.innerHTML = c.paid
+                            ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> PAID'
+                            : '💳 PAID?';
+                    }
+                    card.classList.toggle('pay-ok', !!c.paid);
+                    card.classList.toggle('pay-none', !c.paid);
+                }
+                updateSummary();
+            }
+        });
+
+        grid.addEventListener('change', e => {
+            const el = e.target;
+            if (el.matches('.cost-inp')) setTotal(el.dataset.cid, el.dataset.iid, el.value);
+            if (el.matches('.item-name-inp')) setItemName(el.dataset.cid, el.dataset.iid, el.value);
+            if (el.matches('.cname-inp')) setCustName(el.dataset.cid, el.value);
+        });
+
+        grid.addEventListener('input', e => {
+            const el = e.target;
+            if (el.matches('.item-name-inp')) {
+                showAutocomplete(el, el.dataset.cid, el.dataset.iid);
+            }
+        });
+
+        grid.addEventListener('focusout', e => {
+            if (e.target.matches('.item-name-inp')) {
+                setTimeout(() => hideAutocomplete(e.target.dataset.cid, e.target.dataset.iid), 150);
+            }
+        });
+
+        grid.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && e.target.matches('.item-name-inp')) {
+                hideAutocomplete(e.target.dataset.cid, e.target.dataset.iid);
+            }
+            if (e.key === 'Enter' && e.target.matches('.custom-inp'))
+                addCustomCost(e.target.dataset.cid, e.target.dataset.iid);
+        });
+
+        /* ══ TOOLBAR ══════════════════════════ */
+        document.getElementById('btn-new').addEventListener('click', createCustomer);
+
+        document.getElementById('btn-clear').addEventListener('click', () => {
+            const n = S.customers.filter(c => c.served).length;
+            if (!n) { toast('No served customers to clear', 'warn'); return; }
+            const btn = document.getElementById('btn-clear');
+            if (btn.dataset.armed === '1') {
+                S.customers = S.customers.filter(c => !c.served);
+                save(); renderAll(); toast(n + ' customer(s) cleared');
+                btn.dataset.armed = '0'; btn.textContent = 'Clear Served'; btn.style.color = '';
+            } else {
+                btn.dataset.armed = '1';
+                btn.textContent = 'Confirm clear ' + n + '?';
+                btn.style.color = 'var(--red)';
+                setTimeout(() => {
+                    if (btn) { btn.dataset.armed = '0'; btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> Clear Served`; btn.style.color = ''; }
+                }, 2500);
+            }
+        });
+
+        document.getElementById('btn-export').addEventListener('click', exportPDF);
+
+        /* ══ MENU MANAGEMENT ═════════════════ */
+        document.getElementById('btn-menu').addEventListener('click', openMenuModal);
+        document.getElementById('btn-menu-close').addEventListener('click', () => document.getElementById('menu-modal-bg').classList.remove('open'));
+        document.getElementById('btn-menu-add').addEventListener('click', addMenuItem);
+
+        function renderMenuModal() {
+            const list = document.getElementById('menu-list');
+            list.innerHTML = MENU.map(m => `
+                <div style="display: flex; gap: 8px; align-items: center; background: var(--surface); padding: 8px; border-radius: 6px; border: 1px solid var(--border);" id="menu-row-${m.id}">
+                    <div style="flex: 1; font-weight: 700; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(m.name)} <span style="color:var(--muted); font-weight:normal; font-size:0.7rem;">${esc(m.type || '')}</span></div>
+                    <div style="font-family: var(--mono); color: var(--accent); font-size: 0.8rem; font-weight: 700; min-width: 45px; text-align: right;">₹${m.price}</div>
+                    <div style="display: flex; gap: 4px; padding-left: 8px;">
+                        <button onclick="editMenuItemStart('${m.id}')" style="background:none; border:none; color:var(--text); cursor:pointer; font-size:1.1rem; padding: 0 5px;" title="Edit">✏️</button>
+                        <button onclick="deleteMenuItem('${m.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:1.1rem; padding: 0 5px;" title="Delete">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openMenuModal() {
+            if (syncStatus !== 'live') {
+                toast('Cannot manage menu while offline', 'warn');
+                return;
+            }
+            renderMenuModal();
+            document.getElementById('menu-modal-bg').classList.add('open');
+        }
+
+        async function addMenuItem() {
+            const name = document.getElementById('new-menu-name').value.trim();
+            const type = document.getElementById('new-menu-type').value.trim();
+            const price = document.getElementById('new-menu-price').value;
+            if (!name || !price) return toast('Name and price required', 'warn');
+            
+            const btn = document.getElementById('btn-menu-add');
+            btn.disabled = true;
+            try {
+                const res = await fetch(`${API_BASE}/api/menu`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-shop-pin': SHOP_PIN },
+                    body: JSON.stringify({ name, type, price })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    MENU = data.menu;
+                    renderMenuModal();
+                    document.getElementById('new-menu-name').value = '';
+                    document.getElementById('new-menu-type').value = '';
+                    document.getElementById('new-menu-price').value = '';
+                    toast('Menu item added');
+                }
+            } catch (e) { toast('Error adding item', 'warn'); }
+            btn.disabled = false;
+        }
+
+        window.editMenuItemStart = function(id) {
+            const m = MENU.find(x => x.id === id);
+            if (!m) return;
+            const row = document.getElementById('menu-row-' + id);
+            if (!row) return;
+            row.innerHTML = `
+                <input id="edit-name-${id}" value="${esc(m.name)}" placeholder="Name" style="flex: 1.5; min-width: 60px; font-size: 0.75rem; padding: 4px;">
+                <input id="edit-type-${id}" value="${esc(m.type || '')}" placeholder="Type" style="flex: 1; min-width: 50px; font-size: 0.75rem; padding: 4px;">
+                <input id="edit-price-${id}" type="number" value="${m.price}" placeholder="₹" style="flex: 0.5; min-width: 45px; font-size: 0.75rem; padding: 4px;">
+                <div style="display: flex; gap: 4px;">
+                    <button onclick="editMenuItemSave('${id}')" style="background:none; border:none; color:var(--green); cursor:pointer; font-size:1.1rem; padding: 0 5px;" title="Save">✔</button>
+                    <button onclick="renderMenuModal()" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.1rem; padding: 0 5px;" title="Cancel">✕</button>
+                </div>
+            `;
+        };
+
+        window.editMenuItemSave = async function(id) {
+            const name = document.getElementById('edit-name-' + id).value.trim();
+            const type = document.getElementById('edit-type-' + id).value.trim();
+            const price = document.getElementById('edit-price-' + id).value;
+            if (!name || !price) return toast('Name and price required', 'warn');
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/menu/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'x-shop-pin': SHOP_PIN },
+                    body: JSON.stringify({ name, type, price: Number(price) })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    MENU = data.menu;
+                    renderMenuModal();
+                    toast('Item updated!');
+                } else {
+                    toast('Failed to update', 'warn');
+                }
+            } catch (e) { toast('Error updating', 'warn'); }
+        };
+
+        window.deleteMenuItem = async function(id) {
+            try {
+                const res = await fetch(`${API_BASE}/api/menu/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'x-shop-pin': SHOP_PIN }
+                });
+                if (res.ok) {
+                    MENU = MENU.filter(m => m.id !== id);
+                    renderMenuModal();
+                    toast('Item deleted');
+                }
+            } catch (e) { toast('Error deleting', 'warn'); }
+        };
+
+        function exportPDF() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+            const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+            let totalCost = 0, totalPaid = 0;
+            S.customers.forEach(c => {
+                const b = c.items.reduce((s, i) => s + i.total, 0);
+                totalCost += b;
+                if (c.paid) totalPaid += b;   // paid is boolean 1/0, not money amount
+            });
+            const totalRem = Math.max(0, totalCost - totalPaid);
+
+            // Build customer rows
+            let rows = '';
+            S.customers.forEach(c => {
+                const cTot = c.items.reduce((s, i) => s + i.total, 0);
+                const cPaid = c.paid ? cTot : 0;   // paid=1 means full bill paid
+                const cBal = cTot - cPaid;
+                const pSt = c.paid ? 'paid' : 'unpaid';
+                const pColor = c.paid ? '#3ecf8e' : '#f05d5d';
+                const pLabel = c.paid
+                    ? ('✓ Paid' + (c.payMethod === 'cash' ? ' · Cash' : c.payMethod === 'upi' ? ' · UPI' : ''))
+                    : 'Unpaid';
+                const status = c.served ? 'Served' : 'Active';
+                const statusColor = c.served ? '#3ecf8e' : '#f5a623';
+
+                if (!c.items.length) {
+                    rows += '<tr class="cust-row">'
+                        + '<td><span class="cust-name">' + esc(c.name) + '</span></td>'
+                        + '<td><span class="badge" style="background:' + statusColor + '20;color:' + statusColor + '">' + status + '</span></td>'
+                        + '<td class="item-name muted">—</td>'
+                        + '<td class="num">₹0</td>'
+                        + '<td class="num">₹' + cPaid + '</td>'
+                        + '<td class="num ' + (cBal > 0 ? 'red' : 'grn') + '">₹' + Math.max(0, cBal) + '</td>'
+                        + '<td><span class="badge" style="background:' + pColor + '20;color:' + pColor + '">' + pLabel + '</span></td>'
+                        + '</tr>';
+                } else {
+                    c.items.forEach((item, idx) => {
+                        const iStatus = item.served ? '✓' : '…';
+                        const iColor = item.served ? '#3ecf8e' : '#9898b0';
+                        const trClass = idx === 0 ? 'cust-row' : 'cont-row';
+                        const custCells = idx === 0
+                            ? '<td rowspan="' + c.items.length + '"><span class="cust-name">' + esc(c.name) + '</span></td>'
+                            + '<td rowspan="' + c.items.length + '"><span class="badge" style="background:' + statusColor + '20;color:' + statusColor + '">' + status + '</span></td>'
+                            : '';
+                        const payCells = idx === 0
+                            ? '<td rowspan="' + c.items.length + '" class="num grn">₹' + cPaid + '</td>'
+                            + '<td rowspan="' + c.items.length + '" class="num ' + (cBal > 0 ? 'red' : 'grn') + '">₹' + Math.max(0, cBal) + '</td>'
+                            + '<td rowspan="' + c.items.length + '"><span class="badge" style="background:' + pColor + '20;color:' + pColor + '">' + pLabel + '</span></td>'
+                            : '';
+                        rows += '<tr class="' + trClass + '">'
+                            + custCells
+                            + '<td class="item-name"><span style="color:' + iColor + ';margin-right:5px">' + iStatus + '</span>' + esc(item.name) + (item.parcel ? ' <span style="background:#5d9cf020;color:#5d9cf0;border:1px solid #5d9cf040;border-radius:4px;font-size:.6rem;padding:1px 5px;font-weight:700;letter-spacing:.3px">📦 PARCEL</span>' : '') + '</td>'
+                            + '<td class="num">₹' + item.total + '</td>'
+                            + payCells
+                            + '</tr>';
+                    });
+                }
+            });
+
+            // ── ANALYTICS ──────────────────────────
+            let cashCount = 0, cashTotal = 0, upiCount = 0, upiTotal = 0;
+            let unpaidCount = 0, unpaidTotal = 0, parcelCount = 0;
+            let servedCount = 0, activeCount = 0;
+            const itemMap = {}; // name → {qty, revenue}
+
+            S.customers.forEach(c => {
+                const bill = c.items.reduce((s, i) => s + i.total, 0);
+                if (c.served) servedCount++; else activeCount++;
+                if (c.paid) {
+                    if (c.payMethod === 'cash') { cashCount++; cashTotal += bill; }
+                    else if (c.payMethod === 'upi') { upiCount++; upiTotal += bill; }
+                    else { cashCount++; cashTotal += bill; } // paid but no method = cash assumed
+                } else {
+                    unpaidCount++; unpaidTotal += bill;
+                }
+                c.items.forEach(i => {
+                    if (i.parcel) parcelCount++;
+                    const key = i.name || 'Unknown';
+                    if (!itemMap[key]) itemMap[key] = { qty: 0, revenue: 0 };
+                    itemMap[key].qty++;
+                    itemMap[key].revenue += i.total;
+                });
+            });
+
+            // top items by qty
+            const topItems = Object.entries(itemMap)
+                .sort((a, b) => b[1].qty - a[1].qty)
+                .slice(0, 8);
+
+            // avg bill per paid customer
+            const paidCusts = cashCount + upiCount;
+            const avgBill = paidCusts > 0 ? Math.round((cashTotal + upiTotal) / paidCusts) : 0;
+
+            // cash vs upi split %
+            const totalCollected = cashTotal + upiTotal;
+            const cashPct = totalCollected > 0 ? Math.round((cashTotal / totalCollected) * 100) : 0;
+            const upiPct = totalCollected > 0 ? 100 - cashPct : 0;
+
+            // top items HTML
+            const topItemsHTML = topItems.map(([name, d]) => {
+                const pct = totalCost > 0 ? Math.round((d.revenue / totalCost) * 100) : 0;
+                return '<tr>'
+                    + '<td style="padding:7px 10px;font-size:.8rem;color:#1a1a2e;font-weight:600">' + esc(name) + '</td>'
+                    + '<td style="padding:7px 10px;text-align:center;font-family:\'JetBrains Mono\',monospace;font-weight:700;color:#0e0e0f">' + d.qty + '×</td>'
+                    + '<td style="padding:7px 10px;text-align:right;font-family:\'JetBrains Mono\',monospace;font-weight:700;color:#1a9967">₹' + d.revenue + '</td>'
+                    + '<td style="padding:7px 10px">'
+                    + '<div style="background:#e8e8f0;border-radius:99px;height:6px;overflow:hidden">'
+                    + '<div style="background:#3ecf8e;height:100%;width:' + pct + '%;border-radius:99px"></div>'
+                    + '</div>'
+                    + '</td>'
+                    + '</tr>';
+            }).join('');
+
+            const analysisSection = `
+<div style="margin-top:28px;page-break-inside:avoid">
+  <div class="section-title" style="margin-bottom:16px">📊 Day Analysis</div>
+
+  <!-- Payment Method Breakdown -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div style="background:#f0fdf6;border:1px solid #3ecf8e40;border-radius:10px;padding:16px;border-left:4px solid #3ecf8e">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1a9967;margin-bottom:6px">💵 Cash</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;color:#1a9967;line-height:1">₹${cashTotal}</div>
+      <div style="font-size:.68rem;color:#6b6b80;margin-top:4px">${cashCount} customer${cashCount !== 1 ? 's' : ''} &nbsp;·&nbsp; ${cashPct}% of collection</div>
+    </div>
+    <div style="background:#f0f5ff;border:1px solid #5d9cf040;border-radius:10px;padding:16px;border-left:4px solid #5d9cf0">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2d72c4;margin-bottom:6px">📲 UPI</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;color:#2d72c4;line-height:1">₹${upiTotal}</div>
+      <div style="font-size:.68rem;color:#6b6b80;margin-top:4px">${upiCount} customer${upiCount !== 1 ? 's' : ''} &nbsp;·&nbsp; ${upiPct}% of collection</div>
+    </div>
+    <div style="background:#fff2f2;border:1px solid #f05d5d40;border-radius:10px;padding:16px;border-left:4px solid #f05d5d">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#c43e3e;margin-bottom:6px">⏳ Unpaid</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;color:#c43e3e;line-height:1">₹${unpaidTotal}</div>
+      <div style="font-size:.68rem;color:#6b6b80;margin-top:4px">${unpaidCount} customer${unpaidCount !== 1 ? 's' : ''} pending</div>
+    </div>
+  </div>
+
+  <!-- Cash vs UPI bar -->
+  ${totalCollected > 0 ? `
+  <div style="margin-bottom:20px;background:#f8f8fc;border-radius:10px;padding:14px 16px">
+    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#9898b0;margin-bottom:8px">Collection Split</div>
+    <div style="display:flex;border-radius:8px;overflow:hidden;height:22px;gap:2px">
+      ${cashPct > 0 ? `<div style="background:#3ecf8e;width:${cashPct}%;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;color:#fff;font-family:'JetBrains Mono',monospace">💵 ${cashPct}%</div>` : ''}
+      ${upiPct > 0 ? `<div style="background:#5d9cf0;width:${upiPct}%;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;color:#fff;font-family:'JetBrains Mono',monospace">📲 ${upiPct}%</div>` : ''}
+    </div>
+  </div>`: ''}
+
+  <!-- Key Stats Row -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
+    <div style="background:#f8f8fc;border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#0e0e0f">${S.customers.length}</div>
+      <div style="font-size:.6rem;color:#9898b0;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Total Customers</div>
+    </div>
+    <div style="background:#f8f8fc;border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#1a9967">${servedCount}</div>
+      <div style="font-size:.6rem;color:#9898b0;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Served</div>
+    </div>
+    <div style="background:#f8f8fc;border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#f5a623">₹${avgBill}</div>
+      <div style="font-size:.6rem;color:#9898b0;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Avg Bill</div>
+    </div>
+    <div style="background:#f8f8fc;border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#5d9cf0">${parcelCount}</div>
+      <div style="font-size:.6rem;color:#9898b0;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">📦 Parcels</div>
+    </div>
+  </div>
+
+  <!-- Top Items -->
+  ${topItems.length > 0 ? `
+  <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#9898b0;margin-bottom:8px">🏆 Top Items</div>
+  <table style="width:100%;border-collapse:collapse;background:#f8f8fc;border-radius:10px;overflow:hidden">
+    <thead>
+      <tr style="background:#0e0e0f">
+        <th style="padding:8px 10px;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#fff">Item</th>
+        <th style="padding:8px 10px;text-align:center;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#fff">Qty</th>
+        <th style="padding:8px 10px;text-align:right;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#fff">Revenue</th>
+        <th style="padding:8px 10px;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#fff">Share</th>
+      </tr>
+    </thead>
+    <tbody>${topItemsHTML}</tbody>
+  </table>`: ''}
+</div>`;
+
+            const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>ShopTrack Report — ${dateStr}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Syne',sans-serif;background:#fff;color:#1a1a2e;padding:32px 40px;font-size:13px}
+  
+  /* HEADER */
+  .report-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #f5a623}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand-dot{width:12px;height:12px;border-radius:50%;background:#f5a623}
+  .brand-name{font-size:1.5rem;font-weight:800;letter-spacing:-.5px;color:#0e0e0f}
+  .brand-sub{font-size:.72rem;color:#9898b0;font-family:'JetBrains Mono',monospace;margin-top:2px}
+  .report-meta{text-align:right;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#6b6b80;line-height:1.7}
+  .report-meta strong{color:#0e0e0f;font-size:.8rem}
+
+  /* SUMMARY CARDS */
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+  .scard{border-radius:10px;padding:14px 16px;border:1px solid #e8e8f0}
+  .scard.o{background:#fff8ee;border-color:#f5a62340}
+  .scard.g{background:#f0fdf6;border-color:#3ecf8e40}
+  .scard.r{background:#fff2f2;border-color:#f05d5d40}
+  .scard.b{background:#f0f5ff;border-color:#5d9cf040}
+  .scard-lbl{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+  .scard.o .scard-lbl{color:#c47d0a}
+  .scard.g .scard-lbl{color:#1a9967}
+  .scard.r .scard-lbl{color:#c43e3e}
+  .scard.b .scard-lbl{color:#2d72c4}
+  .scard-val{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;line-height:1}
+  .scard.o .scard-val{color:#f5a623}
+  .scard.g .scard-val{color:#3ecf8e}
+  .scard.r .scard-val{color:#f05d5d}
+  .scard.b .scard-val{color:#5d9cf0}
+
+  /* TABLE */
+  .section-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#9898b0;margin-bottom:10px}
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  thead th{background:#0e0e0f;color:#fff;padding:9px 12px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  thead th.num{text-align:right}
+  tbody tr{border-bottom:1px solid #f0f0f5}
+  tbody tr:last-child{border-bottom:none}
+  td{padding:8px 12px;vertical-align:middle}
+  .cust-row td{background:#fafafa}
+  .cont-row td{background:#fff}
+  .subtotal-row td{background:#f5f5fa;border-top:1px dashed #ddd}
+  .cust-name{font-weight:700;font-size:.88rem;color:#0e0e0f}
+  .item-name{color:#444;font-size:.8rem}
+  .muted{color:#aaa}
+  .num{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600}
+  .grn{color:#1a9967}
+  .red{color:#c43e3e}
+  .badge{border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 7px;letter-spacing:.3px;text-transform:uppercase;white-space:nowrap}
+
+  /* GRAND TOTAL */
+  .grand-total{margin-top:16px;background:#0e0e0f;border-radius:10px;padding:14px 20px;display:flex;justify-content:flex-end;gap:32px;color:#fff}
+  .gt-grp{text-align:right}
+  .gt-lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.8px;color:#6b6b80;margin-bottom:2px}
+  .gt-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.1rem}
+  .gt-val.o{color:#f5a623}.gt-val.g{color:#3ecf8e}.gt-val.r{color:#f05d5d}
+
+  /* FOOTER */
+  .report-footer{margin-top:24px;text-align:center;font-size:.65rem;color:#ccc;font-family:'JetBrains Mono',monospace;border-top:1px solid #f0f0f5;padding-top:14px}
+
+  @media print{
+    body{padding:20px 28px}
+    @page{margin:1cm;size:A4}
+  }
+</style>
+</head>
+<body>
+
+<div class="report-hdr">
+  <div>
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div class="brand-name">ShopTrack</div>
+    </div>
+    <div class="brand-sub">Order Report</div>
+  </div>
+  <div class="report-meta">
+    <div><strong>${dateStr}</strong></div>
+    <div>${timeStr}</div>
+    <div>${S.customers.length} customer(s) &nbsp;·&nbsp; ${S.customers.filter(c => c.served).length} served</div>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="scard o"><div class="scard-lbl">Total Billed</div><div class="scard-val">₹${totalCost}</div></div>
+  <div class="scard g"><div class="scard-lbl">Collected</div><div class="scard-val">₹${totalPaid}</div></div>
+  <div class="scard r"><div class="scard-lbl">Pending</div><div class="scard-val">₹${totalRem}</div></div>
+  <div class="scard b"><div class="scard-lbl">Customers</div><div class="scard-val">${S.customers.length}</div></div>
+</div>
+
+<div class="section-title">Order Details</div>
+<table>
+  <thead>
+    <tr>
+      <th>Customer</th>
+      <th>Status</th>
+      <th>Item</th>
+      <th class="num">Item Cost</th>
+      <th class="num">Paid</th>
+      <th class="num">Balance</th>
+      <th>Payment</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div class="grand-total">
+  <div class="gt-grp"><div class="gt-lbl">Total Billed</div><div class="gt-val o">₹${totalCost}</div></div>
+  <div class="gt-grp"><div class="gt-lbl">Collected</div><div class="gt-val g">₹${totalPaid}</div></div>
+  <div class="gt-grp"><div class="gt-lbl">Pending</div><div class="gt-val r">₹${totalRem}</div></div>
+</div>
+
+${analysisSection}
+
+<div class="report-footer">Generated by ShopTrack &nbsp;·&nbsp; ${dateStr} ${timeStr} &nbsp;·&nbsp; Use browser Print → Save as PDF</div>
+
+<scr${'i'}pt>window.onload=()=>window.print()</scr${'i'}pt>
+</bo${'d'}y>
+</ht${'m'}l>`;
+
+            const w = window.open('', '_blank', 'width=900,height=700');
+            if (!w) { toast('Allow popups to export PDF', 'warn'); return; }
+            w.document.write(html);
+            w.document.close();
+            toast('PDF preview opened!');
+        }
+
+        /* ══ COMPLETE THE DAY ════════════════ */
+        document.getElementById('btn-endday').addEventListener('click', () => {
+            const btn = document.getElementById('btn-endday');
+            if (btn.dataset.armed === '1') {
+                // Export PDF first, then wipe
+                exportPDF();
+                setTimeout(async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/end-day`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-shop-pin': SHOP_PIN }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            toast(`🌙 Day completed! Billed: ₹${data.summary.totalBilled}`);
+                            // SSE will automatically push the empty state back to us and renderAll
+                        } else {
+                            toast('Failed to end day on server', 'warn');
+                        }
+                    } catch (e) {
+                        toast('Server error', 'warn');
+                    }
+                    
+                    btn.dataset.armed = '0';
+                    btn.classList.remove('armed');
+                    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Complete the Day`;
+                }, 600);
+            } else {
+                btn.dataset.armed = '1';
+                btn.classList.add('armed');
+                btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Tap again to confirm`;
+                setTimeout(() => {
+                    if (btn.dataset.armed === '1') {
+                        btn.dataset.armed = '0';
+                        btn.classList.remove('armed');
+                        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Complete the Day`;
+                    }
+                }, 3000);
+            }
+        });
+
+        /* ══ FILTER TABS ══════════════════════ */
+        document.querySelector('.filter-tabs').addEventListener('click', e => {
+            const tab = e.target.closest('.tab'); if (!tab) return;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            activeFilter = tab.dataset.filter;
+            renderAll();
+        });
+
+        /* ══ KEYBOARD ════════════════════════ */
+        document.addEventListener('keydown', e => {
+            // nothing currently
+        });
+
+        /* ══ SAVED INDICATOR ════════════════ */
+        function updateSavedAt() {
+            const el = document.getElementById('session-timer');
+            if (!S.savedAt) { el.textContent = 'not saved yet'; return; }
+            const d = new Date(S.savedAt);
+            el.textContent = 'saved ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        /* ══ BOOT ═════════════════════════════ */
+        load(); renderAll(); updateSavedAt();
+        setInterval(updateSavedAt, 10000);
+    </script>
+</body>
+
+</html>
