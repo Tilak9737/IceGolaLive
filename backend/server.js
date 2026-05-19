@@ -105,6 +105,7 @@ const defaultState = {
 let S = defaultState;
 let MENU = defaultMenu;
 let HISTORY = [];
+let DAY_UPI = { upiId: '', upiName: 'ShopTrack', updatedAt: null };
 
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const MENU_FILE = path.join(DATA_DIR, 'menu.json');
@@ -223,7 +224,7 @@ const writeEvent = (res, payload) => {
 };
 
 const broadcast = () => {
-  const payload = { type: 'update', state: S, menu: MENU };
+  const payload = { type: 'update', state: S, menu: MENU, dayUpi: DAY_UPI };
   clients = clients.filter(client => {
     try {
       writeEvent(client.res, payload);
@@ -242,7 +243,7 @@ app.get('/api/events', (req, res) => {
   if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
   res.write('retry: 3000\n\n');
-  writeEvent(res, { type: 'init', state: S, menu: MENU });
+  writeEvent(res, { type: 'init', state: S, menu: MENU, dayUpi: DAY_UPI });
 
   const client = { id: `${Date.now()}-${Math.random()}`, res };
   clients.push(client);
@@ -269,12 +270,29 @@ const mutate = (fn) => {
 };
 
 app.get('/api/state', (req, res) => {
-  res.json({ state: S, menu: MENU });
+  res.json({ state: S, menu: MENU, dayUpi: DAY_UPI });
+});
+
+app.post('/api/day-upi', (req, res) => {
+  const upiId = String(req.body.upiId || '').trim();
+  const upiName = String(req.body.upiName || 'ShopTrack').trim() || 'ShopTrack';
+
+  if (upiId && !UPI_ID_RE.test(upiId)) {
+    return res.status(400).json({ error: 'Invalid UPI ID' });
+  }
+
+  DAY_UPI = {
+    upiId,
+    upiName,
+    updatedAt: upiId ? Date.now() : null
+  };
+  broadcast();
+  res.json({ success: true, dayUpi: DAY_UPI });
 });
 
 app.post('/api/upi/qr', async (req, res) => {
-  const upiId = String(req.body.upiId || '').trim();
-  const upiName = String(req.body.upiName || 'ShopTrack').trim();
+  const upiId = String(req.body.upiId || DAY_UPI.upiId || '').trim();
+  const upiName = String(req.body.upiName || DAY_UPI.upiName || 'ShopTrack').trim();
   const amount = Number(req.body.amount || 0);
   const note = String(req.body.note || 'ShopTrack payment').slice(0, 80);
 
@@ -387,6 +405,7 @@ app.post('/api/end-day', (req, res) => {
 
   HISTORY.push(summary);
   saveHistory();
+  DAY_UPI = { upiId: '', upiName: 'ShopTrack', updatedAt: null };
 
   // Reset state
   mutate(() => {

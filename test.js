@@ -14,6 +14,7 @@
         let activeFilter = 'all';
         let syncStatus = 'offline';
         let activeUpiCustomerId = null;
+        let DAY_UPI = { upiId: '', upiName: 'ShopTrack', updatedAt: null };
         const CLIENT_KEY = 'shoptrack_client_id';
         let CLIENT_ID = localStorage.getItem(CLIENT_KEY);
         if (!CLIENT_ID) {
@@ -42,6 +43,61 @@
             try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch(e){}
             if (shouldRender && changed) renderAll();
             return changed;
+        }
+
+        function applyDayUpi(dayUpi) {
+            DAY_UPI = {
+                upiId: (dayUpi && dayUpi.upiId) || '',
+                upiName: (dayUpi && dayUpi.upiName) || 'ShopTrack',
+                updatedAt: (dayUpi && dayUpi.updatedAt) || null
+            };
+            updateDayUpiUI();
+        }
+
+        function updateDayUpiUI() {
+            const box = document.getElementById('day-upi-box');
+            const input = document.getElementById('day-upi-input');
+            if (!box || !input) return;
+            if (document.activeElement !== input) input.value = DAY_UPI.upiId;
+            box.classList.toggle('ready', !!DAY_UPI.upiId);
+        }
+
+        async function syncDayUpi(upiId, upiName = 'ShopTrack') {
+            if (!SHOP_PIN) return requirePin();
+            const res = await fetch(`${API_BASE}/api/day-upi`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-shop-pin': SHOP_PIN },
+                body: JSON.stringify({ upiId, upiName })
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error((data && data.error) || 'Failed to update UPI');
+            applyDayUpi(data.dayUpi);
+            return data.dayUpi;
+        }
+
+        async function saveDayUpiFromBox() {
+            const input = document.getElementById('day-upi-input');
+            const upiId = input.value.trim();
+            if (!isValidUpiId(upiId)) {
+                toast('Enter a valid UPI ID first', 'warn');
+                input.focus();
+                return;
+            }
+            try {
+                await syncDayUpi(upiId);
+                toast('Today UPI shared with all devices');
+            } catch (e) {
+                toast(e.message || 'Failed to update UPI', 'warn');
+            }
+        }
+
+        async function clearDayUpi() {
+            try {
+                await syncDayUpi('');
+                toast('Today UPI cleared', 'warn');
+            } catch (e) {
+                toast(e.message || 'Failed to clear UPI', 'warn');
+            }
         }
 
         async function save() {
@@ -110,6 +166,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     applyServerState(data.state, false);
+                    applyDayUpi(data.dayUpi);
                     MENU = data.menu;
                     renderAll();
                     setupSSE();
@@ -148,6 +205,7 @@
                         if (data.state && (data.type === 'init' || Number(data.state.version) > lastServerVersion)) {
                             applyServerState(data.state, true);
                         }
+                        if (data.dayUpi) applyDayUpi(data.dayUpi);
                         if (data.menu) MENU = data.menu;
                     }
                 } catch(err) {}
@@ -334,8 +392,8 @@
         function billTotal(c) { return c.items.reduce((s, i) => s + i.total, 0); }
         function payStatus(c) { return c.paid ? 'paid' : 'unpaid'; }
 
-        function getUpiId() { return (document.getElementById('upi-id-input')?.value || '').trim(); }
-        function getUpiName() { return (document.getElementById('upi-name-input')?.value || 'ShopTrack').trim(); }
+        function getUpiId() { return (document.getElementById('upi-id-input')?.value || DAY_UPI.upiId || '').trim(); }
+        function getUpiName() { return (document.getElementById('upi-name-input')?.value || DAY_UPI.upiName || 'ShopTrack').trim(); }
         function isValidUpiId(value) { return /^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z0-9.\-_]{2,}$/.test((value || '').trim()); }
         function formatUpiAmount(amount) { return Math.max(0, Math.round(Number(amount || 0) * 100) / 100).toFixed(2); }
         function buildUpiUrl(c) {
@@ -389,13 +447,13 @@
             const total = c ? billTotal(c) : 0;
             document.getElementById('upi-customer-name').textContent = c ? c.name : 'UPI settings';
             document.getElementById('upi-amount').innerHTML = '&#8377;' + total;
-            document.getElementById('upi-id-input').value = '';
-            document.getElementById('upi-name-input').value = 'ShopTrack';
+            document.getElementById('upi-id-input').value = DAY_UPI.upiId || '';
+            document.getElementById('upi-name-input').value = DAY_UPI.upiName || 'ShopTrack';
             document.getElementById('upi-qr-img').removeAttribute('src');
             document.getElementById('upi-qr-box').classList.remove('show');
             document.getElementById('upi-link-row').classList.remove('show');
             document.getElementById('upi-modal-bg').classList.add('open');
-            setTimeout(() => document.getElementById('upi-id-input').focus(), 40);
+            setTimeout(() => document.getElementById(DAY_UPI.upiId ? 'btn-upi-save' : 'upi-id-input').focus(), 40);
         }
 
         function closeUpiModal() {
@@ -892,6 +950,11 @@
         document.getElementById('btn-menu').addEventListener('click', openMenuModal);
         document.getElementById('btn-menu-close').addEventListener('click', () => document.getElementById('menu-modal-bg').classList.remove('open'));
         document.getElementById('btn-menu-add').addEventListener('click', addMenuItem);
+        document.getElementById('btn-day-upi-save').addEventListener('click', saveDayUpiFromBox);
+        document.getElementById('btn-day-upi-clear').addEventListener('click', clearDayUpi);
+        document.getElementById('day-upi-input').addEventListener('keydown', e => {
+            if (e.key === 'Enter') saveDayUpiFromBox();
+        });
         document.getElementById('btn-upi-close').addEventListener('click', closeUpiModal);
         document.getElementById('btn-upi-save').addEventListener('click', generateActiveUpiQr);
         document.getElementById('btn-upi-copy').addEventListener('click', copyActiveUpiLink);
