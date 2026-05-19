@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
+app.disable('etag');
 app.use(express.json());
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*'
@@ -95,11 +96,106 @@ let HISTORY = [];
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const MENU_FILE = path.join(DATA_DIR, 'menu.json');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+const HEARTBEAT_MS = 25000;
+const MAX_SNAPSHOTS = 80;
+const snapshots = new Map();
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const stateVersion = () => Number.isFinite(Number(S.version)) ? Number(S.version) : 0;
+const normalizeState = (state) => ({
+  ...state,
+  customers: Array.isArray(state.customers) ? state.customers : [],
+  createdAt: Number(state.createdAt) || Date.now(),
+  version: Number.isFinite(Number(state.version)) ? Number(state.version) : 0
+});
+
+const withoutSyncMeta = (state) => {
+  const copy = clone(normalizeState(state));
+  delete copy.version;
+  delete copy.savedAt;
+  delete copy.serverSavedAt;
+  return copy;
+};
+
+const sameStateContent = (a, b) => JSON.stringify(withoutSyncMeta(a)) === JSON.stringify(withoutSyncMeta(b));
+
+const rememberSnapshot = (state) => {
+  const version = Number(state.version);
+  if (!Number.isFinite(version)) return;
+  snapshots.set(version, clone(normalizeState(state)));
+  while (snapshots.size > MAX_SNAPSHOTS) {
+    const oldest = snapshots.keys().next().value;
+    snapshots.delete(oldest);
+  }
+};
+
+const byId = (customers = []) => new Map((Array.isArray(customers) ? customers : []).filter(c => c && c.id).map(c => [c.id, c]));
+const customerChangedFromBase = (customer, baseCustomer) =>
+  JSON.stringify(customer || null) !== JSON.stringify(baseCustomer || null);
+
+const mergeCustomerLists = (serverCustomers, clientCustomers, baseCustomers) => {
+  const clientMap = byId(clientCustomers);
+  const baseMap = byId(baseCustomers);
+  const result = byId(clone(serverCustomers));
+  const clientHadBase = Array.isArray(baseCustomers);
+
+  clientMap.forEach((clientCustomer, id) => {
+    const baseCustomer = baseMap.get(id);
+    if (!clientHadBase || !baseCustomer || customerChangedFromBase(clientCustomer, baseCustomer)) {
+      result.set(id, clone(clientCustomer));
+    }
+  });
+
+  if (clientHadBase) {
+    baseMap.forEach((_, id) => {
+      if (!clientMap.has(id)) {
+        result.delete(id);
+      }
+    });
+  }
+
+  const ordered = [];
+  const seen = new Set();
+  clientCustomers.forEach((customer) => {
+    if (customer && result.has(customer.id) && !seen.has(customer.id)) {
+      ordered.push(result.get(customer.id));
+      seen.add(customer.id);
+    }
+  });
+  serverCustomers.forEach((customer) => {
+    if (customer && result.has(customer.id) && !seen.has(customer.id)) {
+      ordered.push(result.get(customer.id));
+      seen.add(customer.id);
+    }
+  });
+  return ordered;
+};
+
+const mergeState = (serverState, clientState, baseState) => ({
+  ...clone(serverState),
+  customers: mergeCustomerLists(
+    serverState.customers || [],
+    clientState.customers || [],
+    baseState ? baseState.customers || [] : null
+  )
+});
+
+const commitState = (nextState) => {
+  const nextVersion = stateVersion() + 1;
+  S = normalizeState(nextState);
+  S.version = nextVersion;
+  S.serverSavedAt = Date.now();
+  saveState();
+  rememberSnapshot(S);
+  broadcast();
+};
 
 // Load from disk
 try { if (fs.existsSync(STATE_FILE)) S = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) { console.error('Failed to load state', e); }
 try { if (fs.existsSync(MENU_FILE)) MENU = JSON.parse(fs.readFileSync(MENU_FILE, 'utf8')); } catch (e) { console.error('Failed to load menu', e); }
 try { if (fs.existsSync(HISTORY_FILE)) HISTORY = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch (e) { console.error('Failed to load history', e); }
+S = normalizeState(S);
+rememberSnapshot(S);
 
 // Save helper (debounced/synchronous for simplicity here since traffic is low)
 const saveState = () => fs.writeFileSync(STATE_FILE, JSON.stringify(S));
@@ -109,23 +205,44 @@ const saveHistory = () => fs.writeFileSync(HISTORY_FILE, JSON.stringify(HISTORY)
 // --- SSE Setup ---
 let clients = [];
 
+const writeEvent = (res, payload) => {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+};
+
 const broadcast = () => {
-  const data = JSON.stringify({ type: 'update', state: S, menu: MENU });
-  clients.forEach(client => client.res.write(`data: ${data}\n\n`));
+  const payload = { type: 'update', state: S, menu: MENU };
+  clients = clients.filter(client => {
+    try {
+      writeEvent(client.res, payload);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  });
 };
 
 app.get('/api/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
-  // Send initial state immediately
-  res.write(`data: ${JSON.stringify({ type: 'init', state: S, menu: MENU })}\n\n`);
+  res.write('retry: 3000\n\n');
+  writeEvent(res, { type: 'init', state: S, menu: MENU });
 
-  const client = { id: Date.now(), res };
+  const client = { id: `${Date.now()}-${Math.random()}`, res };
   clients.push(client);
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`: keep-alive ${Date.now()}\n\n`);
+    } catch (err) {
+      clearInterval(heartbeat);
+    }
+  }, HEARTBEAT_MS);
 
   req.on('close', () => {
+    clearInterval(heartbeat);
     clients = clients.filter(c => c.id !== client.id);
   });
 });
@@ -135,9 +252,7 @@ app.get('/api/events', (req, res) => {
 // Mutate helper
 const mutate = (fn) => {
   fn();
-  S.version++;
-  saveState();
-  broadcast();
+  commitState(S);
 };
 
 app.get('/api/state', (req, res) => {
@@ -146,18 +261,32 @@ app.get('/api/state', (req, res) => {
 
 // Full state sync (if frontend changes multiple things or rolls back)
 app.post('/api/sync', (req, res) => {
-  const newState = req.body;
-  if (!newState || typeof newState.version !== 'number') return res.status(400).json({ error: 'Invalid state' });
-  
-  if (newState.version > S.version) {
-    S = newState;
-    saveState();
-    broadcast();
-    return res.json({ success: true, state: S });
-  } else {
-    // Client is behind, reject sync and send them latest
-    return res.status(409).json({ success: false, state: S });
+  const body = req.body || {};
+  const incoming = body.state && Array.isArray(body.state.customers) ? body.state : body;
+  const baseVersion = Number.isFinite(Number(body.baseVersion)) ? Number(body.baseVersion) : null;
+
+  if (!incoming || !Array.isArray(incoming.customers)) {
+    return res.status(400).json({ error: 'Invalid state' });
   }
+
+  const clientState = normalizeState(incoming);
+
+  if (clientState.createdAt && S.createdAt && clientState.createdAt < S.createdAt) {
+    return res.status(409).json({ success: false, reason: 'stale-day', state: S });
+  }
+
+  const effectiveBaseVersion = baseVersion !== null ? baseVersion : clientState.version - 1;
+  const baseState = Number.isFinite(effectiveBaseVersion) ? snapshots.get(effectiveBaseVersion) : null;
+  const shouldMerge =
+    (baseVersion !== null && effectiveBaseVersion < stateVersion()) ||
+    (baseVersion === null && clientState.version <= stateVersion());
+  const nextState = shouldMerge ? mergeState(S, clientState, baseState) : clientState;
+
+  if (!sameStateContent(nextState, S)) {
+    commitState(nextState);
+  }
+
+  return res.json({ success: true, state: S });
 });
 
 // Menu Management

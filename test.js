@@ -13,12 +13,38 @@
         let S = { customers: [], createdAt: Date.now(), version: 0 };
         let activeFilter = 'all';
         let syncStatus = 'offline';
+        const CLIENT_KEY = 'shoptrack_client_id';
+        let CLIENT_ID = localStorage.getItem(CLIENT_KEY);
+        if (!CLIENT_ID) {
+            CLIENT_ID = uid();
+            localStorage.setItem(CLIENT_KEY, CLIENT_ID);
+        }
+        let lastServerVersion = Number(S.version) || 0;
 
         /* ══ PERSIST / API ════════════════════ */
         let isSyncing = false;
         let syncQueue = false;
 
+        function stateContentKey(state) {
+            const copy = JSON.parse(JSON.stringify(state || {}));
+            delete copy.version;
+            delete copy.savedAt;
+            delete copy.serverSavedAt;
+            return JSON.stringify(copy);
+        }
+
+        function applyServerState(nextState, shouldRender = true) {
+            if (!nextState || !Array.isArray(nextState.customers)) return false;
+            const changed = stateContentKey(nextState) !== stateContentKey(S);
+            S = nextState;
+            lastServerVersion = Number(S.version) || lastServerVersion;
+            try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch(e){}
+            if (shouldRender && changed) renderAll();
+            return changed;
+        }
+
         async function save() {
+            const baseVersion = lastServerVersion;
             S.version++;
             S.savedAt = Date.now();
             try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { }
@@ -35,15 +61,22 @@
                 const res = await fetch(`${API_BASE}/api/sync`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-shop-pin': SHOP_PIN },
-                    body: JSON.stringify(S)
+                    body: JSON.stringify({ state: S, baseVersion, clientId: CLIENT_ID })
                 });
+                const data = await res.json().catch(() => null);
                 if (res.status === 401) {
                     toast('Invalid PIN!', 'warn');
                     requirePin();
-                } else if (res.status === 409) {
-                    const data = await res.json();
-                    S = data.state;
-                    renderAll();
+                } else if (data && data.state) {
+                    if (syncQueue && res.ok) {
+                        lastServerVersion = Number(data.state.version) || lastServerVersion;
+                    } else {
+                        const changed = applyServerState(data.state, true);
+                        if (!res.ok || changed) {
+                            toast('State synced with server', res.ok ? 'ok' : 'warn');
+                        }
+                    }
+                } else if (!res.ok) {
                     toast('State synced with server', 'warn');
                 }
             } catch (err) {
@@ -75,7 +108,7 @@
                 if (res.status === 401) return requirePin();
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.state && data.state.version > S.version) S = data.state;
+                    applyServerState(data.state, false);
                     MENU = data.menu;
                     renderAll();
                     setupSSE();
@@ -111,10 +144,8 @@
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'init' || data.type === 'update') {
-                        if (data.state && data.state.version > S.version) {
-                            S = data.state;
-                            try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch(e){}
-                            renderAll();
+                        if (data.state && (data.type === 'init' || Number(data.state.version) > lastServerVersion)) {
+                            applyServerState(data.state, true);
                         }
                         if (data.menu) MENU = data.menu;
                     }
