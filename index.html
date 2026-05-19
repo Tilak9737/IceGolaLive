@@ -1199,6 +1199,19 @@
         }
 
         /* ── CARD FOOTER & TOTALS ─────────── */
+        .pay-qr-btn {
+            border-color: rgba(245, 166, 35, .45);
+            color: var(--accent);
+            min-width: 44px;
+            justify-content: center;
+        }
+
+        .pay-qr-btn:hover {
+            background: rgba(245, 166, 35, .12);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
         .ccard-footer {
             padding: 10px 14px 13px;
             border-top: 1px solid var(--border);
@@ -1359,6 +1372,71 @@
         }
 
         /* ── TOAST ─────────────────────────── */
+        .upi-pay-summary {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: end;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+        }
+
+        .upi-pay-label {
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: .68rem;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+
+        .upi-pay-name {
+            font-weight: 800;
+            margin-top: 3px;
+        }
+
+        .upi-pay-amount {
+            color: var(--accent);
+            font-family: var(--mono);
+            font-size: 1.35rem;
+            font-weight: 800;
+        }
+
+        .upi-qr-box {
+            display: none;
+            place-items: center;
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            margin: 10px auto 14px;
+            width: fit-content;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08);
+        }
+
+        .upi-qr-box.show {
+            display: grid;
+        }
+
+        .upi-qr-box img {
+            width: min(260px, 70vw);
+            height: min(260px, 70vw);
+            display: block;
+        }
+
+        .upi-link-row {
+            display: none;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .upi-link-row.show {
+            display: flex;
+        }
+
         #toast {
             position: fixed;
             bottom: 26px;
@@ -1537,6 +1615,39 @@
         </div>
     </div>
 
+    <div class="modal-bg" id="upi-modal-bg">
+        <div class="modal" style="width: min(430px, 95vw);">
+            <h2>UPI Payment QR</h2>
+            <div class="upi-pay-summary">
+                <div>
+                    <div class="upi-pay-label">Customer</div>
+                    <div class="upi-pay-name" id="upi-customer-name">-</div>
+                </div>
+                <div class="upi-pay-amount" id="upi-amount">&#8377;0</div>
+            </div>
+            <div class="fg">
+                <label for="upi-id-input">UPI ID</label>
+                <input type="text" id="upi-id-input" placeholder="yourname@bank">
+            </div>
+            <div class="fg">
+                <label for="upi-name-input">Payee name</label>
+                <input type="text" id="upi-name-input" placeholder="Shop name">
+            </div>
+            <div class="upi-qr-box" id="upi-qr-box">
+                <img id="upi-qr-img" alt="UPI payment QR">
+            </div>
+            <div class="upi-link-row" id="upi-link-row">
+                <a class="btn btn-success" id="upi-open-link" href="#">Open UPI App</a>
+                <button class="btn btn-ghost" id="btn-upi-copy">Copy Link</button>
+                <button class="btn btn-ghost" id="btn-upi-paid">Mark UPI Paid</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="btn-upi-close">Close</button>
+                <button class="btn btn-success" id="btn-upi-save">Generate QR</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast"></div>
 
     <script>
@@ -1596,6 +1707,7 @@
         let S = { customers: [], createdAt: Date.now(), version: 0 };
         let activeFilter = 'all';
         let syncStatus = 'offline';
+        let activeUpiCustomerId = null;
         const CLIENT_KEY = 'shoptrack_client_id';
         let CLIENT_ID = localStorage.getItem(CLIENT_KEY);
         if (!CLIENT_ID) {
@@ -1918,6 +2030,110 @@
         function billTotal(c) { return c.items.reduce((s, i) => s + i.total, 0); }
         function payStatus(c) { return c.paid ? 'paid' : 'unpaid'; }
 
+        function getUpiId() { return (document.getElementById('upi-id-input')?.value || '').trim(); }
+        function getUpiName() { return (document.getElementById('upi-name-input')?.value || 'ShopTrack').trim(); }
+        function isValidUpiId(value) { return /^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z0-9.\-_]{2,}$/.test((value || '').trim()); }
+        function formatUpiAmount(amount) { return Math.max(0, Math.round(Number(amount || 0) * 100) / 100).toFixed(2); }
+        function buildUpiUrl(c) {
+            const amount = formatUpiAmount(billTotal(c));
+            const params = new URLSearchParams({
+                pa: getUpiId(),
+                pn: getUpiName(),
+                am: amount,
+                cu: 'INR',
+                tn: 'ShopTrack ' + (c.name || 'payment')
+            });
+            return 'upi://pay?' + params.toString();
+        }
+
+        async function renderUpiQr(c) {
+            const upiId = document.getElementById('upi-id-input').value.trim();
+            const upiName = document.getElementById('upi-name-input').value.trim() || 'ShopTrack';
+            if (!isValidUpiId(upiId)) {
+                toast('Enter a valid UPI ID first', 'warn');
+                document.getElementById('upi-id-input').focus();
+                return;
+            }
+            document.getElementById('btn-upi-save').disabled = true;
+            try {
+                const res = await fetch(`${API_BASE}/api/upi/qr`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-shop-pin': SHOP_PIN },
+                    body: JSON.stringify({
+                        upiId,
+                        upiName,
+                        amount: billTotal(c),
+                        note: 'ShopTrack ' + (c.name || 'payment')
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to generate QR');
+                document.getElementById('upi-qr-img').src = data.qrDataUrl;
+                document.getElementById('upi-open-link').href = data.upiUrl || buildUpiUrl(c);
+                document.getElementById('upi-qr-box').classList.add('show');
+                document.getElementById('upi-link-row').classList.add('show');
+            } catch (e) {
+                toast(e.message || 'Failed to generate QR', 'warn');
+            } finally {
+                document.getElementById('btn-upi-save').disabled = false;
+            }
+        }
+
+        function openUpiModal(cid = null) {
+            activeUpiCustomerId = cid;
+            const c = cid ? gc(cid) : null;
+            const total = c ? billTotal(c) : 0;
+            document.getElementById('upi-customer-name').textContent = c ? c.name : 'UPI settings';
+            document.getElementById('upi-amount').innerHTML = '&#8377;' + total;
+            document.getElementById('upi-id-input').value = '';
+            document.getElementById('upi-name-input').value = 'ShopTrack';
+            document.getElementById('upi-qr-img').removeAttribute('src');
+            document.getElementById('upi-qr-box').classList.remove('show');
+            document.getElementById('upi-link-row').classList.remove('show');
+            document.getElementById('upi-modal-bg').classList.add('open');
+            setTimeout(() => document.getElementById('upi-id-input').focus(), 40);
+        }
+
+        function closeUpiModal() {
+            document.getElementById('upi-modal-bg').classList.remove('open');
+        }
+
+        async function generateActiveUpiQr() {
+            const c = activeUpiCustomerId ? gc(activeUpiCustomerId) : null;
+            if (!c) {
+                const upiId = document.getElementById('upi-id-input').value.trim();
+                const upiName = document.getElementById('upi-name-input').value.trim() || 'ShopTrack';
+                if (!isValidUpiId(upiId)) return toast('Enter a valid UPI ID first', 'warn');
+                toast('UPI ID is entered only when making a QR', 'warn');
+                closeUpiModal();
+                return;
+            }
+            if (billTotal(c) <= 0) return toast('Add bill amount before QR', 'warn');
+            await renderUpiQr(c);
+        }
+
+        async function copyActiveUpiLink() {
+            const c = activeUpiCustomerId ? gc(activeUpiCustomerId) : null;
+            if (!c || !isValidUpiId(getUpiId())) return;
+            try {
+                await navigator.clipboard.writeText(buildUpiUrl(c));
+                toast('UPI link copied');
+            } catch (e) {
+                toast('Copy failed', 'warn');
+            }
+        }
+
+        function markActiveUpiPaid() {
+            const c = activeUpiCustomerId ? gc(activeUpiCustomerId) : null;
+            if (!c) return;
+            c.paid = 1;
+            c.payMethod = 'upi';
+            save();
+            rebuildCard(c.id);
+            closeUpiModal();
+            toast('Marked UPI paid');
+        }
+
         function togglePaid(cid) {
             const c = gc(cid); if (!c) return;
             c.paid = c.paid ? 0 : 1;
@@ -2117,6 +2333,7 @@
         <div class="pay-method-row">
           <button class="pay-method-btn${c.payMethod === 'cash' ? ' active-cash' : ''}" data-action="setpaymethod" data-cid="${c.id}" data-method="cash">💵 Cash</button>
           <button class="pay-method-btn${c.payMethod === 'upi' ? ' active-upi' : ''}" data-action="setpaymethod" data-cid="${c.id}" data-method="upi">📲 UPI</button>
+          <button class="pay-method-btn pay-qr-btn" data-action="showupi" data-cid="${c.id}" title="Show exact amount UPI QR">QR</button>
         </div>
       </div>
     </div>
@@ -2275,6 +2492,7 @@
             if (action === 'additem') addItem(cid);
             if (action === 'completecust') completeCustomer(cid);
             if (action === 'togglepaid') togglePaid(cid);
+            if (action === 'showupi') openUpiModal(cid);
             if (action === 'setpaymethod') {
                 const c = gc(cid); if (!c) return;
                 // toggle off if already selected, else set
@@ -2358,6 +2576,13 @@
         document.getElementById('btn-menu').addEventListener('click', openMenuModal);
         document.getElementById('btn-menu-close').addEventListener('click', () => document.getElementById('menu-modal-bg').classList.remove('open'));
         document.getElementById('btn-menu-add').addEventListener('click', addMenuItem);
+        document.getElementById('btn-upi-close').addEventListener('click', closeUpiModal);
+        document.getElementById('btn-upi-save').addEventListener('click', generateActiveUpiQr);
+        document.getElementById('btn-upi-copy').addEventListener('click', copyActiveUpiLink);
+        document.getElementById('btn-upi-paid').addEventListener('click', markActiveUpiPaid);
+        document.getElementById('upi-modal-bg').addEventListener('click', e => {
+            if (e.target.id === 'upi-modal-bg') closeUpiModal();
+        });
 
         function renderMenuModal() {
             const list = document.getElementById('menu-list');

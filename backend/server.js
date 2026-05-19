@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const QRCode = require('qrcode');
 
 const app = express();
 app.disable('etag');
@@ -13,6 +14,18 @@ app.use(cors({
 
 const PORT = process.env.PORT || 3001;
 const PIN = process.env.SHOP_PIN || '1234';
+const UPI_ID_RE = /^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z0-9.\-_]{2,}$/;
+const formatUpiAmount = (amount) => (Math.round(Number(amount || 0) * 100) / 100).toFixed(2);
+const buildUpiUrl = ({ upiId, upiName, amount, note }) => {
+  const params = new URLSearchParams({
+    pa: upiId,
+    pn: upiName || 'ShopTrack',
+    am: formatUpiAmount(amount),
+    cu: 'INR',
+    tn: note || 'ShopTrack payment'
+  });
+  return `upi://pay?${params.toString()}`;
+};
 
 // Basic Auth Middleware
 const requirePin = (req, res, next) => {
@@ -257,6 +270,33 @@ const mutate = (fn) => {
 
 app.get('/api/state', (req, res) => {
   res.json({ state: S, menu: MENU });
+});
+
+app.post('/api/upi/qr', async (req, res) => {
+  const upiId = String(req.body.upiId || '').trim();
+  const upiName = String(req.body.upiName || 'ShopTrack').trim();
+  const amount = Number(req.body.amount || 0);
+  const note = String(req.body.note || 'ShopTrack payment').slice(0, 80);
+
+  if (!UPI_ID_RE.test(upiId)) {
+    return res.status(400).json({ error: 'Invalid UPI ID' });
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+
+  try {
+    const upiUrl = buildUpiUrl({ upiId, upiName, amount, note });
+    const qrDataUrl = await QRCode.toDataURL(upiUrl, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 260
+    });
+    res.json({ upiUrl, qrDataUrl });
+  } catch (err) {
+    console.error('Failed to generate UPI QR', err);
+    res.status(500).json({ error: 'Failed to generate QR' });
+  }
 });
 
 // Full state sync (if frontend changes multiple things or rolls back)
