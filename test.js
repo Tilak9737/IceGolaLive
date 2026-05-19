@@ -715,9 +715,12 @@
                 ? menuItem.name + ' (' + menuItem.type + ') ×' + qty
                 : menuItem.name + ' (' + menuItem.type + ')';
             inp.value = label;
-            setItemName(cid, iid, label);
             const item = gi(cid, iid);
-            if (item) { item.total = totalPrice; save(); }
+            if (item) {
+                item.name = label;
+                item.total = totalPrice;
+                save();
+            }
             const row = document.getElementById('item-' + cid + '-' + iid);
             if (row) {
                 const ci = row.querySelector('.cost-inp');
@@ -765,6 +768,15 @@
                     const m = results[parseInt(btn.dataset.ridx)];
                     const qty = parseInt(btn.dataset.qty);
                     applyMenuItem(cid, iid, m, qty, inp, dd);
+                });
+            });
+
+            dd.querySelectorAll('.ac-item').forEach(row => {
+                row.addEventListener('mousedown', e => {
+                    if (e.target.closest('.ac-qty')) return;
+                    e.preventDefault();
+                    const m = results[parseInt(row.dataset.idx)];
+                    applyMenuItem(cid, iid, m, 1, inp, dd);
                 });
             });
         }
