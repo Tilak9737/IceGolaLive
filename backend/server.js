@@ -4,6 +4,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const QRCode = require('qrcode');
+const { Pool } = require('pg');
 
 const app = express();
 app.disable('etag');
@@ -14,6 +15,8 @@ app.use(cors({
 
 const PORT = process.env.PORT || 3001;
 const PIN = process.env.SHOP_PIN || '1234';
+const DATABASE_URL = process.env.DATABASE_URL || '';
+const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
 const UPI_ID_RE = /^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z0-9.\-_]{2,}$/;
 const formatUpiAmount = (amount) => (Math.round(Number(amount || 0) * 100) / 100).toFixed(2);
 const buildUpiUrl = ({ upiId, upiName, amount, note }) => {
@@ -106,6 +109,8 @@ let S = defaultState;
 let MENU = defaultMenu;
 let HISTORY = [];
 let DAY_UPI = { upiId: '', upiName: 'ShopTrack', updatedAt: null };
+let dbPool = null;
+let dbReady = false;
 
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const MENU_FILE = path.join(DATA_DIR, 'menu.json');
@@ -113,6 +118,40 @@ const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 const HEARTBEAT_MS = 25000;
 const MAX_SNAPSHOTS = 80;
 const snapshots = new Map();
+
+const dbJson = (value) => JSON.stringify(value);
+
+const businessDate = (value = Date.now()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date(value));
+  const byType = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+};
+
+const readJsonFile = (file, fallback) => {
+  try {
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (err) {
+    console.error(`Failed to load ${path.basename(file)}`, err);
+  }
+  return fallback;
+};
+
+const archiveRow = (row, includeState = false) => {
+  const archive = {
+    id: String(row.id),
+    businessDate: row.business_date,
+    openedAt: row.opened_at,
+    closedAt: row.closed_at,
+    summary: row.summary || {}
+  };
+  if (includeState) archive.state = row.state || { customers: [] };
+  return archive;
+};
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const stateVersion = () => Number.isFinite(Number(S.version)) ? Number(S.version) : 0;
@@ -194,27 +233,114 @@ const mergeState = (serverState, clientState, baseState) => ({
   )
 });
 
-const commitState = (nextState) => {
+const commitState = async (nextState) => {
   const nextVersion = stateVersion() + 1;
   S = normalizeState(nextState);
   S.version = nextVersion;
   S.serverSavedAt = Date.now();
-  saveState();
+  await saveState();
   rememberSnapshot(S);
   broadcast();
 };
 
-// Load from disk
-try { if (fs.existsSync(STATE_FILE)) S = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) { console.error('Failed to load state', e); }
-try { if (fs.existsSync(MENU_FILE)) MENU = JSON.parse(fs.readFileSync(MENU_FILE, 'utf8')); } catch (e) { console.error('Failed to load menu', e); }
-try { if (fs.existsSync(HISTORY_FILE)) HISTORY = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch (e) { console.error('Failed to load history', e); }
-S = normalizeState(S);
-rememberSnapshot(S);
+const initDb = async () => {
+  if (!DATABASE_URL) return;
+  dbPool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: /localhost|127\.0\.0\.1/.test(DATABASE_URL) ? false : { rejectUnauthorized: false }
+  });
 
-// Save helper (debounced/synchronous for simplicity here since traffic is low)
-const saveState = () => fs.writeFileSync(STATE_FILE, JSON.stringify(S));
-const saveMenu = () => fs.writeFileSync(MENU_FILE, JSON.stringify(MENU));
-const saveHistory = () => fs.writeFileSync(HISTORY_FILE, JSON.stringify(HISTORY));
+  await dbPool.query(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      id TEXT PRIMARY KEY,
+      state JSONB NOT NULL,
+      menu JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS day_archives (
+      id BIGSERIAL PRIMARY KEY,
+      business_date DATE NOT NULL,
+      opened_at TIMESTAMPTZ NOT NULL,
+      closed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      summary JSONB NOT NULL,
+      state JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_day_archives_business_date
+      ON day_archives (business_date DESC, id DESC);
+  `);
+  dbReady = true;
+};
+
+const loadFromStorage = async () => {
+  S = normalizeState(readJsonFile(STATE_FILE, defaultState));
+  MENU = readJsonFile(MENU_FILE, defaultMenu);
+  HISTORY = readJsonFile(HISTORY_FILE, []);
+
+  if (dbReady) {
+    const current = await dbPool.query('SELECT state, menu FROM app_state WHERE id = $1', ['current']);
+    if (current.rowCount) {
+      S = normalizeState(current.rows[0].state);
+      MENU = Array.isArray(current.rows[0].menu) ? current.rows[0].menu : defaultMenu;
+    } else {
+      await saveState();
+      await saveMenu();
+    }
+  }
+
+  rememberSnapshot(S);
+};
+
+const saveState = async () => {
+  if (dbReady) {
+    await dbPool.query(
+      `INSERT INTO app_state (id, state, menu, updated_at)
+       VALUES ('current', $1::jsonb, $2::jsonb, NOW())
+       ON CONFLICT (id)
+       DO UPDATE SET state = EXCLUDED.state, menu = EXCLUDED.menu, updated_at = NOW()`,
+      [dbJson(S), dbJson(MENU)]
+    );
+  } else {
+    fs.writeFileSync(STATE_FILE, JSON.stringify(S));
+  }
+};
+
+const saveMenu = async () => {
+  if (dbReady) {
+    await dbPool.query(
+      `INSERT INTO app_state (id, state, menu, updated_at)
+       VALUES ('current', $1::jsonb, $2::jsonb, NOW())
+       ON CONFLICT (id)
+       DO UPDATE SET state = EXCLUDED.state, menu = EXCLUDED.menu, updated_at = NOW()`,
+      [dbJson(S), dbJson(MENU)]
+    );
+  } else {
+    fs.writeFileSync(MENU_FILE, JSON.stringify(MENU));
+  }
+};
+
+const saveHistory = async (archive = null) => {
+  if (dbReady && archive) {
+    const result = await dbPool.query(
+      `INSERT INTO day_archives (business_date, opened_at, closed_at, summary, state)
+       VALUES ($1::date, to_timestamp($2 / 1000.0), to_timestamp($3 / 1000.0), $4::jsonb, $5::jsonb)
+       RETURNING id`,
+      [
+        archive.businessDate,
+        archive.openedAt,
+        archive.closedAt,
+        dbJson(archive.summary),
+        dbJson(archive.state)
+      ]
+    );
+    return result.rows[0].id;
+  }
+
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(HISTORY));
+  return null;
+};
 
 // --- SSE Setup ---
 let clients = [];
@@ -264,9 +390,9 @@ app.get('/api/events', (req, res) => {
 // --- REST Endpoints ---
 
 // Mutate helper
-const mutate = (fn) => {
+const mutate = async (fn) => {
   fn();
-  commitState(S);
+  await commitState(S);
 };
 
 app.get('/api/state', (req, res) => {
@@ -318,7 +444,7 @@ app.post('/api/upi/qr', async (req, res) => {
 });
 
 // Full state sync (if frontend changes multiple things or rolls back)
-app.post('/api/sync', (req, res) => {
+app.post('/api/sync', async (req, res) => {
   const body = req.body || {};
   const incoming = body.state && Array.isArray(body.state.customers) ? body.state : body;
   const baseVersion = Number.isFinite(Number(body.baseVersion)) ? Number(body.baseVersion) : null;
@@ -341,42 +467,42 @@ app.post('/api/sync', (req, res) => {
   const nextState = shouldMerge ? mergeState(S, clientState, baseState) : clientState;
 
   if (!sameStateContent(nextState, S)) {
-    commitState(nextState);
+    await commitState(nextState);
   }
 
   return res.json({ success: true, state: S });
 });
 
 // Menu Management
-app.post('/api/menu', (req, res) => {
+app.post('/api/menu', async (req, res) => {
   const { name, type, price } = req.body;
   const id = Math.random().toString(36).substring(2, 9);
   MENU.push({ id, name, type, price: Number(price) });
-  saveMenu();
+  await saveMenu();
   broadcast();
   res.json({ success: true, menu: MENU });
 });
 
-app.put('/api/menu/:id', (req, res) => {
+app.put('/api/menu/:id', async (req, res) => {
   const item = MENU.find(m => m.id === req.params.id);
   if (!item) return res.status(404).json({ error: 'Not found' });
   if (req.body.name !== undefined) item.name = req.body.name;
   if (req.body.type !== undefined) item.type = req.body.type;
   if (req.body.price !== undefined) item.price = Number(req.body.price);
-  saveMenu();
+  await saveMenu();
   broadcast();
   res.json({ success: true, menu: MENU });
 });
 
-app.delete('/api/menu/:id', (req, res) => {
+app.delete('/api/menu/:id', async (req, res) => {
   MENU = MENU.filter(m => m.id !== req.params.id);
-  saveMenu();
+  await saveMenu();
   broadcast();
   res.json({ success: true });
 });
 
 // End of Day & History
-app.post('/api/end-day', (req, res) => {
+app.post('/api/end-day', async (req, res) => {
   // Generate summary
   let totalBilled = 0;
   let totalCollected = 0;
@@ -403,12 +529,22 @@ app.post('/api/end-day', (req, res) => {
     upiTotal
   };
 
+  const archivedState = clone(S);
+  const closedAt = Date.now();
+  const archive = {
+    businessDate: businessDate(closedAt),
+    openedAt: Number(S.createdAt) || closedAt,
+    closedAt,
+    summary,
+    state: archivedState
+  };
+
   HISTORY.push(summary);
-  saveHistory();
+  const archiveId = await saveHistory(archive);
   DAY_UPI = { upiId: '', upiName: 'ShopTrack', updatedAt: null };
 
   // Reset state
-  mutate(() => {
+  await mutate(() => {
     S = {
       customers: [],
       createdAt: Date.now(),
@@ -416,13 +552,77 @@ app.post('/api/end-day', (req, res) => {
     };
   });
 
-  res.json({ success: true, summary });
+  res.json({ success: true, summary, archiveId: archiveId ? String(archiveId) : null });
 });
 
-app.get('/api/history', (req, res) => {
+app.get('/api/history', async (req, res) => {
+  if (dbReady) {
+    const result = await dbPool.query(
+      `SELECT id::text, business_date::text, opened_at, closed_at, summary
+       FROM day_archives
+       ORDER BY closed_at DESC, id DESC
+       LIMIT 50`
+    );
+    return res.json({ history: result.rows.map(row => archiveRow(row)) });
+  }
   res.json({ history: HISTORY });
 });
 
-app.listen(PORT, () => {
-  console.log(`API running on port ${PORT}`);
+app.get('/api/archive', async (req, res) => {
+  const date = String(req.query.date || businessDate()).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Invalid date' });
+  }
+
+  if (!dbReady) {
+    const archives = HISTORY
+      .filter(h => businessDate(h.date || Date.now()) === date)
+      .map((summary, idx) => ({
+        id: `history-${idx}`,
+        businessDate: date,
+        openedAt: summary.date,
+        closedAt: summary.date,
+        summary
+      }));
+    return res.json({ archives });
+  }
+
+  const result = await dbPool.query(
+    `SELECT id::text, business_date::text, opened_at, closed_at, summary
+     FROM day_archives
+     WHERE business_date = $1::date
+     ORDER BY closed_at DESC, id DESC`,
+    [date]
+  );
+  res.json({ archives: result.rows.map(row => archiveRow(row)) });
 });
+
+app.get('/api/archive/:id', async (req, res) => {
+  if (!dbReady) {
+    return res.status(503).json({ error: 'Archive details require DATABASE_URL' });
+  }
+
+  const result = await dbPool.query(
+    `SELECT id::text, business_date::text, opened_at, closed_at, summary, state
+     FROM day_archives
+     WHERE id = $1`,
+    [req.params.id]
+  );
+  if (!result.rowCount) return res.status(404).json({ error: 'Archive not found' });
+  res.json({ archive: archiveRow(result.rows[0], true) });
+});
+
+const start = async () => {
+  try {
+    await initDb();
+    await loadFromStorage();
+    app.listen(PORT, () => {
+      console.log(`API running on port ${PORT}${dbReady ? ' with Postgres' : ' with JSON fallback'}`);
+    });
+  } catch (err) {
+    console.error('Failed to start API', err);
+    process.exit(1);
+  }
+};
+
+start();

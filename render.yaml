@@ -13,3 +13,7 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: BUSINESS_TIMEZONE
+        value: Asia/Kolkata

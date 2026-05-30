@@ -9,12 +9,56 @@
         const SKEY = 'shoptrack_v5';
 
         /* ══ STATE ═══════════════════════════ */
+        const FALLBACK_MENU = [
+            { id: 'fb-1', name: 'Orange', type: 'Plain', price: 30 },
+            { id: 'fb-2', name: 'Orange', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-3', name: 'Kala Khatta', type: 'Plain', price: 30 },
+            { id: 'fb-4', name: 'Kala Khatta', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-5', name: 'Kaccha Aam', type: 'Plain', price: 30 },
+            { id: 'fb-6', name: 'Kaccha Aam', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-7', name: 'Kothu', type: 'Plain', price: 30 },
+            { id: 'fb-8', name: 'Kothu', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-9', name: 'Pineapple', type: 'Plain', price: 30 },
+            { id: 'fb-10', name: 'Pineapple', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-11', name: 'Rose', type: 'Plain', price: 30 },
+            { id: 'fb-12', name: 'Rose', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-13', name: 'Mango', type: 'Plain', price: 30 },
+            { id: 'fb-14', name: 'Mango', type: 'Mava-Malai', price: 50 },
+            { id: 'fb-15', name: 'Blueberry', type: 'Plain', price: 30 },
+            { id: 'fb-16', name: 'Blueberry', type: 'Mava-Malai', price: 60 },
+            { id: 'fb-17', name: 'Rimzim', type: 'Plain', price: 30 },
+            { id: 'fb-18', name: 'Rimzim', type: 'Mava-Malai', price: 60 },
+            { id: 'fb-19', name: 'Chocolate', type: 'Plain', price: 40 },
+            { id: 'fb-20', name: 'Chocolate', type: 'Mava-Malai', price: 60 },
+            { id: 'fb-21', name: 'Raj Bhog', type: 'Plain', price: 40 },
+            { id: 'fb-22', name: 'Raj Bhog', type: 'Mava-Malai', price: 60 },
+            { id: 'fb-23', name: 'Rainbow', type: 'Plain', price: 50 },
+            { id: 'fb-24', name: 'Rainbow', type: 'Mava-Malai', price: 70 },
+            { id: 'fb-25', name: 'Dry Fruit Dish', type: 'Sp. Dish', price: 80 },
+            { id: 'fb-26', name: 'Dry Fruit Dish', type: 'Ice Cream Dish', price: 110 },
+            { id: 'fb-27', name: 'Dry Fruit Rabdi Ice Dish', type: 'Sp. Dish', price: 100 },
+            { id: 'fb-28', name: 'Dry Fruit Rabdi Ice Dish', type: 'Ice Cream Dish', price: 120 },
+            { id: 'fb-29', name: 'Rainbow Rabdi Ice Dish', type: 'Sp. Dish', price: 100 },
+            { id: 'fb-30', name: 'Rainbow Rabdi Ice Dish', type: 'Ice Cream Dish', price: 120 },
+            { id: 'fb-31', name: 'Chocolate Ice Dish', type: 'Sp. Dish', price: 100 },
+            { id: 'fb-32', name: 'Chocolate Ice Dish', type: 'Ice Cream Dish', price: 120 },
+            { id: 'fb-33', name: 'Kit-Kat Chocolate Sp. Dish', type: 'Sp. Dish', price: 120 },
+            { id: 'fb-34', name: 'Kit-Kat Chocolate Sp. Dish', type: 'Ice Cream Dish', price: 150 },
+            { id: 'fb-35', name: 'Shree Hari Sp. Ice Dish', type: 'Matka Small', price: 160 },
+            { id: 'fb-36', name: 'Shree Hari Sp. Ice Dish', type: 'Matka Large', price: 200 },
+            { id: 'fb-37', name: 'Mava Malai', type: 'Topping', price: 20 },
+            { id: 'fb-38', name: 'Chocolate Deep', type: 'Topping', price: 20 },
+            { id: 'fb-39', name: 'Toppings', type: 'Topping', price: 10 }
+        ];
+
         let MENU = [];
         let S = { customers: [], createdAt: Date.now(), version: 0 };
         let activeFilter = 'all';
         let syncStatus = 'offline';
         let activeUpiCustomerId = null;
         let DAY_UPI = { upiId: '', upiName: 'ShopTrack', updatedAt: null };
+        let ARCHIVES = [];
+        let ACTIVE_ARCHIVE = null;
         const CLIENT_KEY = 'shoptrack_client_id';
         let CLIENT_ID = localStorage.getItem(CLIENT_KEY);
         if (!CLIENT_ID) {
@@ -173,7 +217,9 @@
                 }
             } catch (err) {
                 console.error('Initial load failed', err);
-                toast('Offline mode', 'warn');
+                MENU = FALLBACK_MENU;
+                renderAll();
+                toast('Offline mode — using backup menu', 'warn');
                 setupSSE();
             }
         }
@@ -947,6 +993,17 @@
         document.getElementById('btn-export').addEventListener('click', exportPDF);
 
         /* ══ MENU MANAGEMENT ═════════════════ */
+        document.getElementById('btn-archive').addEventListener('click', openArchiveModal);
+        document.getElementById('btn-archive-close').addEventListener('click', closeArchiveModal);
+        document.getElementById('btn-archive-load').addEventListener('click', loadArchives);
+        document.getElementById('btn-archive-pdf').addEventListener('click', exportArchivePDF);
+        document.getElementById('archive-list').addEventListener('click', e => {
+            const row = e.target.closest('.archive-row');
+            if (row) selectArchive(row.dataset.archiveId);
+        });
+        document.getElementById('archive-modal-bg').addEventListener('click', e => {
+            if (e.target.id === 'archive-modal-bg') closeArchiveModal();
+        });
         document.getElementById('btn-menu').addEventListener('click', openMenuModal);
         document.getElementById('btn-menu-close').addEventListener('click', () => document.getElementById('menu-modal-bg').classList.remove('open'));
         document.getElementById('btn-menu-add').addEventListener('click', addMenuItem);
@@ -966,15 +1023,22 @@
         function renderMenuModal() {
             const list = document.getElementById('menu-list');
             list.innerHTML = MENU.map(m => `
-                <div style="display: flex; gap: 8px; align-items: center; background: var(--surface); padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
-                    <div style="flex: 1; font-weight: 700; font-size: 0.8rem;">${esc(m.name)} <span style="color:var(--muted); font-weight:normal; font-size:0.7rem;">${esc(m.type || '')}</span></div>
-                    <div style="font-family: var(--mono); color: var(--accent); font-size: 0.8rem; font-weight: 700;">₹${m.price}</div>
-                    <button class="item-del" onclick="deleteMenuItem('${m.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:1.1rem; padding: 0 5px;">✕</button>
+                <div style="display: flex; gap: 8px; align-items: center; background: var(--surface); padding: 8px; border-radius: 6px; border: 1px solid var(--border);" id="menu-row-${m.id}">
+                    <div style="flex: 1; font-weight: 700; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(m.name)} <span style="color:var(--muted); font-weight:normal; font-size:0.7rem;">${esc(m.type || '')}</span></div>
+                    <div style="font-family: var(--mono); color: var(--accent); font-size: 0.8rem; font-weight: 700; min-width: 45px; text-align: right;">₹${m.price}</div>
+                    <div style="display: flex; gap: 4px; padding-left: 8px;">
+                        <button onclick="editMenuItemStart('${m.id}')" style="background:none; border:none; color:var(--text); cursor:pointer; font-size:1.1rem; padding: 0 5px;" title="Edit">✏️</button>
+                        <button onclick="deleteMenuItem('${m.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:1.1rem; padding: 0 5px;" title="Delete">✕</button>
+                    </div>
                 </div>
             `).join('');
         }
 
         function openMenuModal() {
+            if (syncStatus !== 'live') {
+                toast('Cannot manage menu while offline', 'warn');
+                return;
+            }
             renderMenuModal();
             document.getElementById('menu-modal-bg').classList.add('open');
         }
@@ -984,7 +1048,7 @@
             const type = document.getElementById('new-menu-type').value.trim();
             const price = document.getElementById('new-menu-price').value;
             if (!name || !price) return toast('Name and price required', 'warn');
-            
+
             const btn = document.getElementById('btn-menu-add');
             btn.disabled = true;
             try {
@@ -1006,6 +1070,44 @@
             btn.disabled = false;
         }
 
+        window.editMenuItemStart = function(id) {
+            const m = MENU.find(x => x.id === id);
+            if (!m) return;
+            const row = document.getElementById('menu-row-' + id);
+            if (!row) return;
+            row.innerHTML = `
+                <input id="edit-name-${id}" value="${esc(m.name)}" placeholder="Name" style="flex: 1.5; min-width: 60px; font-size: 0.75rem; padding: 4px;">
+                <input id="edit-type-${id}" value="${esc(m.type || '')}" placeholder="Type" style="flex: 1; min-width: 50px; font-size: 0.75rem; padding: 4px;">
+                <input id="edit-price-${id}" type="number" value="${m.price}" placeholder="₹" style="flex: 0.5; min-width: 45px; font-size: 0.75rem; padding: 4px;">
+                <div style="display: flex; gap: 4px;">
+                    <button onclick="editMenuItemSave('${id}')" style="background:none; border:none; color:var(--green); cursor:pointer; font-size:1.1rem; padding: 0 5px;" title="Save">✔</button>
+                    <button onclick="renderMenuModal()" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.1rem; padding: 0 5px;" title="Cancel">✕</button>
+                </div>
+            `;
+        };
+
+        window.editMenuItemSave = async function(id) {
+            const name = document.getElementById('edit-name-' + id).value.trim();
+            const type = document.getElementById('edit-type-' + id).value.trim();
+            const price = document.getElementById('edit-price-' + id).value;
+            if (!name || !price) return toast('Name and price required', 'warn');
+            try {
+                const res = await fetch(`${API_BASE}/api/menu/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'x-shop-pin': SHOP_PIN },
+                    body: JSON.stringify({ name, type, price: Number(price) })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    MENU = data.menu;
+                    renderMenuModal();
+                    toast('Item updated!');
+                } else {
+                    toast('Failed to update', 'warn');
+                }
+            } catch (e) { toast('Error updating', 'warn'); }
+        };
+
         window.deleteMenuItem = async function(id) {
             try {
                 const res = await fetch(`${API_BASE}/api/menu/${id}`, {
@@ -1020,13 +1122,119 @@
             } catch (e) { toast('Error deleting', 'warn'); }
         };
 
-        function exportPDF() {
-            const now = new Date();
+        function archiveDateValue(date = new Date()) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function money(v) { return '₹' + (Number(v) || 0); }
+
+        async function openArchiveModal() {
+            document.getElementById('archive-modal-bg').classList.add('open');
+            const dateInput = document.getElementById('archive-date');
+            if (!dateInput.value) dateInput.value = archiveDateValue();
+            await loadArchives();
+        }
+
+        function closeArchiveModal() {
+            document.getElementById('archive-modal-bg').classList.remove('open');
+        }
+
+        async function loadArchives() {
+            const date = document.getElementById('archive-date').value || archiveDateValue();
+            const list = document.getElementById('archive-list');
+            const detail = document.getElementById('archive-detail');
+            list.innerHTML = '<div style="padding:12px;color:var(--muted)">Loading...</div>';
+            detail.textContent = 'Select a completed day.';
+            ACTIVE_ARCHIVE = null;
+            try {
+                const res = await fetch(`${API_BASE}/api/archive?date=${encodeURIComponent(date)}`, {
+                    headers: { 'x-shop-pin': SHOP_PIN }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to load archive');
+                ARCHIVES = data.archives || [];
+                renderArchiveList();
+            } catch (e) {
+                list.innerHTML = '<div style="padding:12px;color:var(--red)">Failed to load.</div>';
+                toast(e.message || 'Failed to load archive', 'warn');
+            }
+        }
+
+        function renderArchiveList() {
+            const list = document.getElementById('archive-list');
+            if (!ARCHIVES.length) {
+                list.innerHTML = '<div style="padding:12px;color:var(--muted)">No completed day found.</div>';
+                return;
+            }
+            list.innerHTML = ARCHIVES.map(a => {
+                const s = a.summary || {};
+                const time = new Date(a.closedAt || s.date || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                return `<button class="archive-row" data-archive-id="${a.id}">
+                    <span>${time}</span>
+                    <strong>${money(s.totalBilled)}</strong>
+                </button>`;
+            }).join('');
+        }
+
+        async function selectArchive(id) {
+            try {
+                const res = await fetch(`${API_BASE}/api/archive/${encodeURIComponent(id)}`, {
+                    headers: { 'x-shop-pin': SHOP_PIN }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to load day');
+                ACTIVE_ARCHIVE = data.archive;
+                document.querySelectorAll('.archive-row').forEach(row => {
+                    row.classList.toggle('active', row.dataset.archiveId === id);
+                });
+                renderArchiveDetail(ACTIVE_ARCHIVE);
+            } catch (e) {
+                toast(e.message || 'Failed to load day', 'warn');
+            }
+        }
+
+        function renderArchiveDetail(archive) {
+            const state = archive.state || { customers: [] };
+            const summary = archive.summary || {};
+            const detail = document.getElementById('archive-detail');
+            const customers = state.customers || [];
+            detail.innerHTML = `
+                <div class="archive-stats">
+                    <div class="archive-stat"><span>Billed</span><strong>${money(summary.totalBilled)}</strong></div>
+                    <div class="archive-stat"><span>Collected</span><strong>${money(summary.totalCollected)}</strong></div>
+                    <div class="archive-stat"><span>Cash</span><strong>${money(summary.cashTotal)}</strong></div>
+                    <div class="archive-stat"><span>UPI</span><strong>${money(summary.upiTotal)}</strong></div>
+                </div>
+                <div class="archive-customers">
+                    ${customers.length ? customers.map(c => {
+                        const bill = (c.items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+                        return `<div class="archive-customer-row">
+                            <span>${esc(c.name)} · ${(c.items || []).length} item(s)</span>
+                            <strong>${money(bill)}</strong>
+                        </div>`;
+                    }).join('') : '<div style="color:var(--muted)">No customers in this archive.</div>'}
+                </div>`;
+        }
+
+        function exportArchivePDF() {
+            if (!ACTIVE_ARCHIVE || !ACTIVE_ARCHIVE.state) {
+                toast('Select a day first', 'warn');
+                return;
+            }
+            exportPDF(ACTIVE_ARCHIVE.state, { reportDate: ACTIVE_ARCHIVE.closedAt || ACTIVE_ARCHIVE.businessDate });
+        }
+
+        function exportPDF(reportState = S, opts = {}) {
+            const customers = Array.isArray(reportState.customers) ? reportState.customers : [];
+            const now = opts.reportDate ? new Date(opts.reportDate) : new Date();
             const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
             let totalCost = 0, totalPaid = 0;
-            S.customers.forEach(c => {
+            customers.forEach(c => {
                 const b = c.items.reduce((s, i) => s + i.total, 0);
                 totalCost += b;
                 if (c.paid) totalPaid += b;   // paid is boolean 1/0, not money amount
@@ -1035,7 +1243,7 @@
 
             // Build customer rows
             let rows = '';
-            S.customers.forEach(c => {
+            customers.forEach(c => {
                 const cTot = c.items.reduce((s, i) => s + i.total, 0);
                 const cPaid = c.paid ? cTot : 0;   // paid=1 means full bill paid
                 const cBal = cTot - cPaid;
@@ -1087,7 +1295,7 @@
             let servedCount = 0, activeCount = 0;
             const itemMap = {}; // name → {qty, revenue}
 
-            S.customers.forEach(c => {
+            customers.forEach(c => {
                 const bill = c.items.reduce((s, i) => s + i.total, 0);
                 if (c.served) servedCount++; else activeCount++;
                 if (c.paid) {
@@ -1171,7 +1379,7 @@
   <!-- Key Stats Row -->
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
     <div style="background:#f8f8fc;border-radius:8px;padding:12px;text-align:center">
-      <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#0e0e0f">${S.customers.length}</div>
+      <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#0e0e0f">${customers.length}</div>
       <div style="font-size:.6rem;color:#9898b0;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Total Customers</div>
     </div>
     <div style="background:#f8f8fc;border-radius:8px;padding:12px;text-align:center">
@@ -1289,7 +1497,7 @@
   <div class="report-meta">
     <div><strong>${dateStr}</strong></div>
     <div>${timeStr}</div>
-    <div>${S.customers.length} customer(s) &nbsp;·&nbsp; ${S.customers.filter(c => c.served).length} served</div>
+    <div>${customers.length} customer(s) &nbsp;·&nbsp; ${customers.filter(c => c.served).length} served</div>
   </div>
 </div>
 
@@ -1297,7 +1505,7 @@
   <div class="scard o"><div class="scard-lbl">Total Billed</div><div class="scard-val">₹${totalCost}</div></div>
   <div class="scard g"><div class="scard-lbl">Collected</div><div class="scard-val">₹${totalPaid}</div></div>
   <div class="scard r"><div class="scard-lbl">Pending</div><div class="scard-val">₹${totalRem}</div></div>
-  <div class="scard b"><div class="scard-lbl">Customers</div><div class="scard-val">${S.customers.length}</div></div>
+  <div class="scard b"><div class="scard-lbl">Customers</div><div class="scard-val">${customers.length}</div></div>
 </div>
 
 <div class="section-title">Order Details</div>
@@ -1327,8 +1535,8 @@ ${analysisSection}
 <div class="report-footer">Generated by ShopTrack &nbsp;·&nbsp; ${dateStr} ${timeStr} &nbsp;·&nbsp; Use browser Print → Save as PDF</div>
 
 <scr${'i'}pt>window.onload=()=>window.print()</scr${'i'}pt>
-</body>
-</html>`;
+</bo${'d'}y>
+</ht${'m'}l>`;
 
             const w = window.open('', '_blank', 'width=900,height=700');
             if (!w) { toast('Allow popups to export PDF', 'warn'); return; }

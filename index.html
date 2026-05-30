@@ -1469,6 +1469,126 @@
             display: flex;
         }
 
+        .archive-tools {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .archive-tools input {
+            width: 160px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: var(--mono);
+            padding: 8px 10px;
+            outline: none;
+        }
+
+        .archive-layout {
+            display: grid;
+            grid-template-columns: minmax(170px, 230px) 1fr;
+            gap: 14px;
+            min-height: 260px;
+        }
+
+        .archive-list {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--surface);
+        }
+
+        .archive-row {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 10px 12px;
+            border: 0;
+            border-bottom: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            font-family: var(--display);
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .archive-row:last-child {
+            border-bottom: 0;
+        }
+
+        .archive-row.active,
+        .archive-row:hover {
+            background: rgba(245, 166, 35, .12);
+        }
+
+        .archive-detail {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            background: var(--surface);
+            overflow: auto;
+        }
+
+        .archive-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .archive-stat {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 9px;
+        }
+
+        .archive-stat span {
+            display: block;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: .62rem;
+            text-transform: uppercase;
+        }
+
+        .archive-stat strong {
+            display: block;
+            margin-top: 3px;
+            font-family: var(--mono);
+            color: var(--accent);
+        }
+
+        .archive-customers {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 260px;
+            overflow: auto;
+        }
+
+        .archive-customer-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+            padding: 7px 0;
+            font-size: .82rem;
+        }
+
+        @media (max-width: 720px) {
+            .archive-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .archive-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
         #toast {
             position: fixed;
             bottom: 26px;
@@ -1604,6 +1724,9 @@
                 </svg>
                 Export PDF
             </button>
+            <button class="btn btn-ghost" id="btn-archive">
+                Past Days
+            </button>
             <button class="btn btn-ghost" id="btn-menu">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <path d="M3 6h18M3 12h18M3 18h18" />
@@ -1648,6 +1771,24 @@
             <div class="modal-actions">
                 <button class="btn btn-ghost" id="btn-menu-close">Close</button>
                 <button class="btn btn-success" id="btn-menu-add">+ Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="archive-modal-bg">
+        <div class="modal" style="width: min(820px, 96vw);">
+            <h2>Past Days</h2>
+            <div class="archive-tools">
+                <input type="date" id="archive-date">
+                <button class="btn btn-ghost" id="btn-archive-load">Load</button>
+                <button class="btn btn-success" id="btn-archive-pdf">Download PDF</button>
+            </div>
+            <div class="archive-layout">
+                <div class="archive-list" id="archive-list"></div>
+                <div class="archive-detail" id="archive-detail">Select a completed day.</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="btn-archive-close">Close</button>
             </div>
         </div>
     </div>
@@ -1746,6 +1887,8 @@
         let syncStatus = 'offline';
         let activeUpiCustomerId = null;
         let DAY_UPI = { upiId: '', upiName: 'ShopTrack', updatedAt: null };
+        let ARCHIVES = [];
+        let ACTIVE_ARCHIVE = null;
         const CLIENT_KEY = 'shoptrack_client_id';
         let CLIENT_ID = localStorage.getItem(CLIENT_KEY);
         if (!CLIENT_ID) {
@@ -2680,6 +2823,17 @@
         document.getElementById('btn-export').addEventListener('click', exportPDF);
 
         /* ══ MENU MANAGEMENT ═════════════════ */
+        document.getElementById('btn-archive').addEventListener('click', openArchiveModal);
+        document.getElementById('btn-archive-close').addEventListener('click', closeArchiveModal);
+        document.getElementById('btn-archive-load').addEventListener('click', loadArchives);
+        document.getElementById('btn-archive-pdf').addEventListener('click', exportArchivePDF);
+        document.getElementById('archive-list').addEventListener('click', e => {
+            const row = e.target.closest('.archive-row');
+            if (row) selectArchive(row.dataset.archiveId);
+        });
+        document.getElementById('archive-modal-bg').addEventListener('click', e => {
+            if (e.target.id === 'archive-modal-bg') closeArchiveModal();
+        });
         document.getElementById('btn-menu').addEventListener('click', openMenuModal);
         document.getElementById('btn-menu-close').addEventListener('click', () => document.getElementById('menu-modal-bg').classList.remove('open'));
         document.getElementById('btn-menu-add').addEventListener('click', addMenuItem);
@@ -2799,13 +2953,119 @@
             } catch (e) { toast('Error deleting', 'warn'); }
         };
 
-        function exportPDF() {
-            const now = new Date();
+        function archiveDateValue(date = new Date()) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function money(v) { return '₹' + (Number(v) || 0); }
+
+        async function openArchiveModal() {
+            document.getElementById('archive-modal-bg').classList.add('open');
+            const dateInput = document.getElementById('archive-date');
+            if (!dateInput.value) dateInput.value = archiveDateValue();
+            await loadArchives();
+        }
+
+        function closeArchiveModal() {
+            document.getElementById('archive-modal-bg').classList.remove('open');
+        }
+
+        async function loadArchives() {
+            const date = document.getElementById('archive-date').value || archiveDateValue();
+            const list = document.getElementById('archive-list');
+            const detail = document.getElementById('archive-detail');
+            list.innerHTML = '<div style="padding:12px;color:var(--muted)">Loading...</div>';
+            detail.textContent = 'Select a completed day.';
+            ACTIVE_ARCHIVE = null;
+            try {
+                const res = await fetch(`${API_BASE}/api/archive?date=${encodeURIComponent(date)}`, {
+                    headers: { 'x-shop-pin': SHOP_PIN }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to load archive');
+                ARCHIVES = data.archives || [];
+                renderArchiveList();
+            } catch (e) {
+                list.innerHTML = '<div style="padding:12px;color:var(--red)">Failed to load.</div>';
+                toast(e.message || 'Failed to load archive', 'warn');
+            }
+        }
+
+        function renderArchiveList() {
+            const list = document.getElementById('archive-list');
+            if (!ARCHIVES.length) {
+                list.innerHTML = '<div style="padding:12px;color:var(--muted)">No completed day found.</div>';
+                return;
+            }
+            list.innerHTML = ARCHIVES.map(a => {
+                const s = a.summary || {};
+                const time = new Date(a.closedAt || s.date || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                return `<button class="archive-row" data-archive-id="${a.id}">
+                    <span>${time}</span>
+                    <strong>${money(s.totalBilled)}</strong>
+                </button>`;
+            }).join('');
+        }
+
+        async function selectArchive(id) {
+            try {
+                const res = await fetch(`${API_BASE}/api/archive/${encodeURIComponent(id)}`, {
+                    headers: { 'x-shop-pin': SHOP_PIN }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to load day');
+                ACTIVE_ARCHIVE = data.archive;
+                document.querySelectorAll('.archive-row').forEach(row => {
+                    row.classList.toggle('active', row.dataset.archiveId === id);
+                });
+                renderArchiveDetail(ACTIVE_ARCHIVE);
+            } catch (e) {
+                toast(e.message || 'Failed to load day', 'warn');
+            }
+        }
+
+        function renderArchiveDetail(archive) {
+            const state = archive.state || { customers: [] };
+            const summary = archive.summary || {};
+            const detail = document.getElementById('archive-detail');
+            const customers = state.customers || [];
+            detail.innerHTML = `
+                <div class="archive-stats">
+                    <div class="archive-stat"><span>Billed</span><strong>${money(summary.totalBilled)}</strong></div>
+                    <div class="archive-stat"><span>Collected</span><strong>${money(summary.totalCollected)}</strong></div>
+                    <div class="archive-stat"><span>Cash</span><strong>${money(summary.cashTotal)}</strong></div>
+                    <div class="archive-stat"><span>UPI</span><strong>${money(summary.upiTotal)}</strong></div>
+                </div>
+                <div class="archive-customers">
+                    ${customers.length ? customers.map(c => {
+                        const bill = (c.items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+                        return `<div class="archive-customer-row">
+                            <span>${esc(c.name)} · ${(c.items || []).length} item(s)</span>
+                            <strong>${money(bill)}</strong>
+                        </div>`;
+                    }).join('') : '<div style="color:var(--muted)">No customers in this archive.</div>'}
+                </div>`;
+        }
+
+        function exportArchivePDF() {
+            if (!ACTIVE_ARCHIVE || !ACTIVE_ARCHIVE.state) {
+                toast('Select a day first', 'warn');
+                return;
+            }
+            exportPDF(ACTIVE_ARCHIVE.state, { reportDate: ACTIVE_ARCHIVE.closedAt || ACTIVE_ARCHIVE.businessDate });
+        }
+
+        function exportPDF(reportState = S, opts = {}) {
+            const customers = Array.isArray(reportState.customers) ? reportState.customers : [];
+            const now = opts.reportDate ? new Date(opts.reportDate) : new Date();
             const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
             let totalCost = 0, totalPaid = 0;
-            S.customers.forEach(c => {
+            customers.forEach(c => {
                 const b = c.items.reduce((s, i) => s + i.total, 0);
                 totalCost += b;
                 if (c.paid) totalPaid += b;   // paid is boolean 1/0, not money amount
@@ -2814,7 +3074,7 @@
 
             // Build customer rows
             let rows = '';
-            S.customers.forEach(c => {
+            customers.forEach(c => {
                 const cTot = c.items.reduce((s, i) => s + i.total, 0);
                 const cPaid = c.paid ? cTot : 0;   // paid=1 means full bill paid
                 const cBal = cTot - cPaid;
@@ -2866,7 +3126,7 @@
             let servedCount = 0, activeCount = 0;
             const itemMap = {}; // name → {qty, revenue}
 
-            S.customers.forEach(c => {
+            customers.forEach(c => {
                 const bill = c.items.reduce((s, i) => s + i.total, 0);
                 if (c.served) servedCount++; else activeCount++;
                 if (c.paid) {
@@ -2950,7 +3210,7 @@
   <!-- Key Stats Row -->
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
     <div style="background:#f8f8fc;border-radius:8px;padding:12px;text-align:center">
-      <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#0e0e0f">${S.customers.length}</div>
+      <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#0e0e0f">${customers.length}</div>
       <div style="font-size:.6rem;color:#9898b0;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Total Customers</div>
     </div>
     <div style="background:#f8f8fc;border-radius:8px;padding:12px;text-align:center">
@@ -3068,7 +3328,7 @@
   <div class="report-meta">
     <div><strong>${dateStr}</strong></div>
     <div>${timeStr}</div>
-    <div>${S.customers.length} customer(s) &nbsp;·&nbsp; ${S.customers.filter(c => c.served).length} served</div>
+    <div>${customers.length} customer(s) &nbsp;·&nbsp; ${customers.filter(c => c.served).length} served</div>
   </div>
 </div>
 
@@ -3076,7 +3336,7 @@
   <div class="scard o"><div class="scard-lbl">Total Billed</div><div class="scard-val">₹${totalCost}</div></div>
   <div class="scard g"><div class="scard-lbl">Collected</div><div class="scard-val">₹${totalPaid}</div></div>
   <div class="scard r"><div class="scard-lbl">Pending</div><div class="scard-val">₹${totalRem}</div></div>
-  <div class="scard b"><div class="scard-lbl">Customers</div><div class="scard-val">${S.customers.length}</div></div>
+  <div class="scard b"><div class="scard-lbl">Customers</div><div class="scard-val">${customers.length}</div></div>
 </div>
 
 <div class="section-title">Order Details</div>
