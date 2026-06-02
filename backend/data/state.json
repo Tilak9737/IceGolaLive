@@ -1,1 +1,1 @@
-{"customers":[{"id":"mov8zp3hn10u","name":"Customer 1","served":true,"createdAt":1778143940045,"items":[{"id":"mov8zq31epid","name":"Orange (Plain)","total":30,"gave":30,"served":true}],"paid":1,"payMethod":"cash"}],"createdAt":1777367911775,"version":26,"savedAt":1778143960879}
+{"customers":[],"createdAt":1777367911775,"version":1}
