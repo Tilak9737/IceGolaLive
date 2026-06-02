@@ -270,8 +270,81 @@ const initDb = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_day_archives_business_date
       ON day_archives (business_date DESC, id DESC);
+
+    CREATE TABLE IF NOT EXISTS menu_items (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT '',
+      price NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS current_customers (
+      id TEXT PRIMARY KEY,
+      data JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
   dbReady = true;
+};
+
+const loadMenuRows = async () => {
+  const result = await dbPool.query(
+    `SELECT id, name, type, price
+     FROM menu_items
+     ORDER BY sort_order ASC, name ASC, type ASC`
+  );
+  return result.rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    type: row.type || '',
+    price: Number(row.price)
+  }));
+};
+
+const replaceMenuRows = async (client = dbPool) => {
+  await client.query('DELETE FROM menu_items');
+  for (let idx = 0; idx < MENU.length; idx++) {
+    const item = MENU[idx];
+    await client.query(
+      `INSERT INTO menu_items (id, name, type, price, sort_order, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [
+        item.id || Math.random().toString(36).substring(2, 9),
+        String(item.name || '').trim(),
+        String(item.type || '').trim(),
+        Number(item.price) || 0,
+        idx
+      ]
+    );
+  }
+};
+
+const loadCustomerRows = async () => {
+  const result = await dbPool.query(
+    `SELECT data
+     FROM current_customers
+     ORDER BY COALESCE((data->>'createdAt')::bigint, 0) DESC, updated_at DESC`
+  );
+  return result.rows.map(row => row.data).filter(customer => customer && customer.id);
+};
+
+const replaceCustomerRows = async (client = dbPool) => {
+  await client.query('DELETE FROM current_customers');
+  for (const customer of S.customers) {
+    if (!customer || !customer.id) continue;
+    await client.query(
+      `INSERT INTO current_customers (id, data, created_at, updated_at)
+       VALUES ($1, $2::jsonb, to_timestamp($3 / 1000.0), NOW())`,
+      [
+        customer.id,
+        dbJson(customer),
+        Number(customer.createdAt) || Date.now()
+      ]
+    );
+  }
 };
 
 const loadFromStorage = async () => {
@@ -288,6 +361,20 @@ const loadFromStorage = async () => {
       await saveState();
       await saveMenu();
     }
+
+    const menuRows = await loadMenuRows();
+    if (menuRows.length) {
+      MENU = menuRows;
+    } else {
+      await replaceMenuRows();
+    }
+
+    const customerRows = await loadCustomerRows();
+    if (customerRows.length || S.customers.length) {
+      if (customerRows.length) S.customers = customerRows;
+      else await replaceCustomerRows();
+      await saveState();
+    }
   }
 
   rememberSnapshot(S);
@@ -295,13 +382,24 @@ const loadFromStorage = async () => {
 
 const saveState = async () => {
   if (dbReady) {
-    await dbPool.query(
-      `INSERT INTO app_state (id, state, menu, updated_at)
-       VALUES ('current', $1::jsonb, $2::jsonb, NOW())
-       ON CONFLICT (id)
-       DO UPDATE SET state = EXCLUDED.state, menu = EXCLUDED.menu, updated_at = NOW()`,
-      [dbJson(S), dbJson(MENU)]
-    );
+    const client = await dbPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO app_state (id, state, menu, updated_at)
+         VALUES ('current', $1::jsonb, $2::jsonb, NOW())
+         ON CONFLICT (id)
+         DO UPDATE SET state = EXCLUDED.state, menu = EXCLUDED.menu, updated_at = NOW()`,
+        [dbJson(S), dbJson(MENU)]
+      );
+      await replaceCustomerRows(client);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } else {
     fs.writeFileSync(STATE_FILE, JSON.stringify(S));
   }
@@ -309,13 +407,24 @@ const saveState = async () => {
 
 const saveMenu = async () => {
   if (dbReady) {
-    await dbPool.query(
-      `INSERT INTO app_state (id, state, menu, updated_at)
-       VALUES ('current', $1::jsonb, $2::jsonb, NOW())
-       ON CONFLICT (id)
-       DO UPDATE SET state = EXCLUDED.state, menu = EXCLUDED.menu, updated_at = NOW()`,
-      [dbJson(S), dbJson(MENU)]
-    );
+    const client = await dbPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO app_state (id, state, menu, updated_at)
+         VALUES ('current', $1::jsonb, $2::jsonb, NOW())
+         ON CONFLICT (id)
+         DO UPDATE SET state = EXCLUDED.state, menu = EXCLUDED.menu, updated_at = NOW()`,
+        [dbJson(S), dbJson(MENU)]
+      );
+      await replaceMenuRows(client);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } else {
     fs.writeFileSync(MENU_FILE, JSON.stringify(MENU));
   }
@@ -345,12 +454,18 @@ const saveHistory = async (archive = null) => {
 // --- SSE Setup ---
 let clients = [];
 
+const storageInfo = () => ({
+  database: dbReady,
+  menuTable: dbReady,
+  customerTable: dbReady
+});
+
 const writeEvent = (res, payload) => {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 };
 
 const broadcast = () => {
-  const payload = { type: 'update', state: S, menu: MENU, dayUpi: DAY_UPI };
+  const payload = { type: 'update', state: S, menu: MENU, dayUpi: DAY_UPI, storage: storageInfo() };
   clients = clients.filter(client => {
     try {
       writeEvent(client.res, payload);
@@ -369,7 +484,7 @@ app.get('/api/events', (req, res) => {
   if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
   res.write('retry: 3000\n\n');
-  writeEvent(res, { type: 'init', state: S, menu: MENU, dayUpi: DAY_UPI });
+  writeEvent(res, { type: 'init', state: S, menu: MENU, dayUpi: DAY_UPI, storage: storageInfo() });
 
   const client = { id: `${Date.now()}-${Math.random()}`, res };
   clients.push(client);
@@ -396,7 +511,7 @@ const mutate = async (fn) => {
 };
 
 app.get('/api/state', (req, res) => {
-  res.json({ state: S, menu: MENU, dayUpi: DAY_UPI });
+  res.json({ state: S, menu: MENU, dayUpi: DAY_UPI, storage: storageInfo() });
 });
 
 app.post('/api/day-upi', (req, res) => {

@@ -128,6 +128,16 @@
             font-size: .82rem
         }
 
+        .chip.db-on {
+            border-color: rgba(62, 207, 142, .32);
+            color: var(--green)
+        }
+
+        .chip.db-off {
+            border-color: rgba(240, 93, 93, .32);
+            color: var(--red)
+        }
+
         #session-timer {
             font-family: var(--mono);
             font-size: .7rem;
@@ -1669,6 +1679,7 @@
         <div class="hdr-right">
             <div class="chip">Active <strong id="hdr-active">0</strong></div>
             <div class="chip">Served <strong id="hdr-served">0</strong></div>
+            <div class="chip db-off" id="storage-chip" title="Current backend storage">Storage <strong id="storage-mode">LOCAL</strong></div>
             <span id="session-timer">--:--:--</span>
             <button class="btn btn-end-day btn-sm" id="btn-endday">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -1889,6 +1900,7 @@
         let DAY_UPI = { upiId: '', upiName: 'ShopTrack', updatedAt: null };
         let ARCHIVES = [];
         let ACTIVE_ARCHIVE = null;
+        let STORAGE = { database: false };
         const CLIENT_KEY = 'shoptrack_client_id';
         let CLIENT_ID = localStorage.getItem(CLIENT_KEY);
         if (!CLIENT_ID) {
@@ -1934,6 +1946,20 @@
             if (!box || !input) return;
             if (document.activeElement !== input) input.value = DAY_UPI.upiId;
             box.classList.toggle('ready', !!DAY_UPI.upiId);
+        }
+
+        function applyStorageInfo(storage) {
+            STORAGE = storage || { database: false };
+            const chip = document.getElementById('storage-chip');
+            const mode = document.getElementById('storage-mode');
+            if (!chip || !mode) return;
+            const isDb = !!STORAGE.database;
+            mode.textContent = isDb ? 'DB' : 'LOCAL';
+            chip.classList.toggle('db-on', isDb);
+            chip.classList.toggle('db-off', !isDb);
+            chip.title = isDb
+                ? 'Menu and active customers are saved in the database'
+                : 'Using local file fallback storage';
         }
 
         async function syncDayUpi(upiId, upiName = 'ShopTrack') {
@@ -2041,6 +2067,7 @@
                     const data = await res.json();
                     applyServerState(data.state, false);
                     applyDayUpi(data.dayUpi);
+                    applyStorageInfo(data.storage);
                     MENU = data.menu;
                     renderAll();
                     setupSSE();
@@ -2048,6 +2075,7 @@
             } catch (err) {
                 console.error('Initial load failed', err);
                 MENU = FALLBACK_MENU;
+                applyStorageInfo({ database: false });
                 renderAll();
                 toast('Offline mode — using backup menu', 'warn');
                 setupSSE();
@@ -2078,11 +2106,14 @@
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'init' || data.type === 'update') {
+                        const menuChanged = data.menu && JSON.stringify(data.menu) !== JSON.stringify(MENU);
                         if (data.state && (data.type === 'init' || Number(data.state.version) > lastServerVersion)) {
                             applyServerState(data.state, true);
                         }
                         if (data.dayUpi) applyDayUpi(data.dayUpi);
+                        if (data.storage) applyStorageInfo(data.storage);
                         if (data.menu) MENU = data.menu;
+                        if (menuChanged) renderAll();
                     }
                 } catch(err) {}
             };
